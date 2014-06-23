@@ -77,14 +77,14 @@ typedef struct o70_prop_bag_s o70_prop_bag_t;
  */
 typedef struct o70_kv_s o70_kv_t;
 
-/* o70_object_s *************************************************************/
+/* o70_object_t *************************************************************/
 /**
  *  Standard object structure.
  *  This is for objects that act as dynamic property bags.
  */
 typedef struct o70_object_s o70_object_t;
 
-/* o70_class_s **************************************************************/
+/* o70_class_t **************************************************************/
 /**
  *  Class structure.
  */
@@ -96,31 +96,31 @@ typedef struct o70_class_s o70_class_t;
  */
 typedef struct o70_ctstr_s o70_ctstr_t;
 
-/* o70_id_s *****************************************************************/
+/* o70_id_t *****************************************************************/
 /**
  *  Identifier.
  */
 typedef struct o70_id_s o70_id_t;
 
-/* o70_array_s **************************************************************/
+/* o70_array_t **************************************************************/
 /**
  *  Array of object references.
  */
 typedef struct o70_array_s o70_array_t;
 
-/* o70_function_s ***********************************************************/
+/* o70_function_t ***********************************************************/
 /**
  *  Function object.
  */
 typedef struct o70_function_s o70_function_t;
 
-/* o70_struct_s *************************************************************/
+/* o70_struct_t *************************************************************/
 /**
  *  Struct object.
  */
 typedef struct o70_struct_s o70_struct_t;
 
-/* o70_struct_class_s *******************************************************/
+/* o70_struct_class_t *******************************************************/
 /**
  *  Class object for Struct-derived objects.
  */
@@ -156,7 +156,13 @@ typedef struct o70_esf_s o70_esf_t;
  */
 typedef struct o70_ehi_s o70_ehi_t;
 
+/* o70_slim_obj_t ***********************************************************/
+/**
+ *  Slim object (object without properties).
+ */
+typedef struct o70_slim_obj_s o70_slim_obj_t;
 
+#if 0
 /* o70_obj_init_f ***********************************************************/
 /**
  *  Object initialiser function prototype.
@@ -171,45 +177,53 @@ typedef o70_status_t (C42_CALL * o70_obj_init_f)
         o70_flow_t * flow,
         o70_ref_t obj
     );
+#endif
 
-
-/* o71_obj_finish_f *********************************************************/
+/* o70_obj_finish_f *********************************************************/
 /**
  *  Finishes an object.
  *  This is responsible for cleaning up references to other objects and
  *  releasing any native resources held by the object.
  *  @retval O70S_OK     init ok
  */
-typedef o70_status_t (C42_CALL * o71_obj_finish_f)
+typedef o70_status_t (C42_CALL * o70_obj_finish_f)
     (
         o70_flow_t * flow,
         o70_ref_t obj
     );
 
-struct o70_world_s
-{
-    union
-    {
-        o70_ohdr_t * * ohdr; /**< table to all object headers */
-        uintptr_t * nfx; /**< next free index table */
-    };
-    o70_module_t * * mod; /**< array of pointers to modules */
+/* o70_obj_get_prop_f *******************************************************/
+/**
+ *  Gets an object property.
+ *  For primitive objects this usually fills @a value_ptr and returns #O70S_OK.
+ *  In more complex scenarios this can push a function call in the execution
+ *  stack and return #O70S_PENDING.
+ */
+typedef o70_status_t (C42_CALL * o70_obj_get_prop_f)
+    (
+        o70_flow_t * flow,
+        o70_ref_t obj, 
+        o70_ref_t prop_id, 
+        o70_ref_t * value_ptr, 
+        void * context
+    );
 
-    size_t on; /**< number of inited object entries */
-    size_t om; /**< number of allocated object entries */
-    size_t ffx; /**< first free index */
-
-    size_t mn; /**< number of used modules */
-    size_t mm; /**< number of allocated modules */
-
-    size_t fn; /**< number of flows */
-
-    c42_ma_t * ma; /**< memory allocator */
-
-    c42_io8_t * in; /**< standard input */
-    c42_io8_t * out; /**< standard output */
-    c42_io8_t * err; /**< standard error */
-};
+/* o70_obj_set_prop_f *******************************************************/
+/**
+ *  Sets an object property.
+ *  For primitive objects this usually updates the object instance and 
+ *  returns #O70S_OK.
+ *  In more complex scenarios this can push a function call in the execution
+ *  stack and return #O70S_PENDING.
+ */
+typedef o70_status_t (C42_CALL * o70_obj_set_prop_f) 
+    (
+        o70_flow_t * flow,
+        o70_ref_t obj, 
+        o70_ref_t prop_id, 
+        o70_ref_t value, 
+        void * context
+    );
 
 struct o70_esf_s
 {
@@ -264,6 +278,11 @@ struct o70_prop_bag_s
     c42_rbtree_t rbt; /**< red/black tree */
 };
 
+struct o70_slim_obj_s
+{
+    o70_ohdr_t ohdr; /**< object header */
+};
+
 struct o70_object_s
 {
     o70_ohdr_t ohdr; /**< object header */
@@ -275,6 +294,15 @@ struct o70_class_s
     o70_ohdr_t ohdr; /**< object header */
     o70_prop_bag_t fields; /**< fields */
     o70_prop_bag_t methods; /**< methods */
+    o70_obj_finish_f finish; /**< finish callback */
+    o70_obj_get_prop_f get_prop; /**< get property */
+    o70_obj_set_prop_f set_prop; /**< set property */
+    /**< set property */
+
+    void * finish_context; /**< context for o70_class_t#finish */
+    void * prop_context;
+    /**< context for o70_class_t#get_prop and o70_class_t#set_prop */
+
     // size_t instance_size; /**< size in bytes of instances */
     // size_t class_size; /**< size in bytes of the class object */
 };
@@ -383,6 +411,40 @@ struct o70_module_s
     o70_ref_t varctx; /**< var context for the globals of this module */
 };
 
+struct o70_world_s
+{
+    union
+    {
+        o70_ohdr_t * * ohdr; /**< table to all object headers */
+        uintptr_t * nfx; /**< next free index table */
+    };
+    o70_module_t * * mod; /**< array of pointers to modules */
+
+    size_t on; /**< number of inited object entries */
+    size_t om; /**< number of allocated object entries */
+    size_t ffx; /**< first free index */
+
+    size_t mn; /**< number of used modules */
+    size_t mm; /**< number of allocated modules */
+
+    size_t fn; /**< number of flows */
+
+    c42_ma_t * ma; /**< memory allocator */
+
+    c42_io8_t * in; /**< standard input */
+    c42_io8_t * out; /**< standard output */
+    c42_io8_t * err; /**< standard error */
+
+    o70_slim_obj_t null_obj; /**< null object */
+    o70_slim_obj_t false_obj; /**< false object */
+    o70_slim_obj_t true_obj; /**< true object */
+    o70_class_t null_class; /**< null class */
+    o70_class_t bool_class; /**< bool class */
+    o70_class_t int_class; /**< int class */
+    o70_class_t object_class; /**< object class */
+    o70_class_t class_class; /**< class class */
+    o70_class_t id_class; /**< id class */
+};
 /* o70_opcodes **************************************************************/
 /**
  *  Opcodes for the scripting VM.
@@ -427,6 +489,8 @@ enum o70_statuses
     O70S_OK = 0, /**< all ok */
     O70S_BAD_ARG, /**< some argument or input field has an incorrect value */
     O70S_NO_MEM, /**< allocation failed */
+    O70S_PENDING, /**< operation is pending; more scripting code needs to be 
+                    executed before completing the operation */
 
     O70S_BUG = 0x70,
     O70S_TODO,
