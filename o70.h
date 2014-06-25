@@ -420,6 +420,8 @@ struct o70_world_s
     };
     o70_module_t * * mod; /**< array of pointers to modules */
 
+    c42_rbtree_t idt; /**< tree of identifiers */
+
     size_t on; /**< number of inited object entries */
     size_t om; /**< number of allocated object entries */
     size_t ffx; /**< first free index */
@@ -444,6 +446,27 @@ struct o70_world_s
     o70_class_t object_class; /**< object class */
     o70_class_t class_class; /**< class class */
     o70_class_t id_class; /**< id class */
+    o70_class_t array_class; /**< array class */
+    o70_class_t function_class; /**< function class */
+    o70_class_t string_class; /**< string class */
+    o70_class_t ctstring_class; /**< const string class */
+    o70_class_t exception_class; /**< exception class */
+    o70_class_t module_class; /**< module class */
+    o70_slim_obj_t null_id; /**< null id */
+    o70_slim_obj_t false_id; /**< false id */
+    o70_slim_obj_t true_id; /**< true id */
+    o70_class_t null_class_id; /**< null id */
+    o70_class_t bool_id; /**< bool id */
+    o70_class_t int_id; /**< int id */
+    o70_class_t object_id; /**< object id */
+    o70_class_t class_id; /**< class id */
+    o70_class_t id_id; /**< id id */
+    o70_class_t array_id; /**< array id */
+    o70_class_t function_id; /**< function id */
+    o70_class_t string_id; /**< string id */
+    o70_class_t ctstring_id; /**< const string id */
+    o70_class_t exception_id; /**< exception id */
+    o70_class_t module_id; /**< module id */
 };
 /* o70_opcodes **************************************************************/
 /**
@@ -487,10 +510,10 @@ enum o70_opcodes
 enum o70_statuses
 {
     O70S_OK = 0, /**< all ok */
-    O70S_BAD_ARG, /**< some argument or input field has an incorrect value */
-    O70S_NO_MEM, /**< allocation failed */
     O70S_PENDING, /**< operation is pending; more scripting code needs to be 
                     executed before completing the operation */
+    O70S_BAD_ARG, /**< some argument or input field has an incorrect value */
+    O70S_NO_MEM, /**< allocation failed */
 
     O70S_BUG = 0x70,
     O70S_TODO,

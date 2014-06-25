@@ -49,6 +49,9 @@ O70_API uint8_t const * C42_CALL o70_status_name (o70_status_t sc)
     switch (sc)
     {
         X(O70S_OK);
+        X(O70S_PENDING);
+        X(O70S_BAD_ARG);
+        X(O70S_NO_MEM);
 
         X(O70S_BUG);
         X(O70S_TODO);
@@ -57,7 +60,11 @@ O70_API uint8_t const * C42_CALL o70_status_name (o70_status_t sc)
 }
 
 /* o70_world_init ***********************************************************/
-O70_API o70_status_t o70_world_init (o70_world_t * w, o70_init_t * ini)
+O70_API o70_status_t C42_CALL o70_world_init
+(
+    o70_world_t * w,
+    o70_init_t * ini
+)
 {
     (void) w;
     (void) ini;
@@ -65,28 +72,31 @@ O70_API o70_status_t o70_world_init (o70_world_t * w, o70_init_t * ini)
 }
 
 /* o70_world_finish *********************************************************/
-O70_API o70_status_t o70_world_finish (o70_world_t * w)
+O70_API o70_status_t C42_CALL o70_world_finish
+(
+    o70_world_t * w
+)
 {
     (void) w;
     return O70S_TODO;
 }
 
 /* o70_flow_create **********************************************************/
-O70_API o70_status_t o70_flow_create 
+O70_API o70_status_t C42_CALL o70_flow_create
 (
-    o70_world_t * w, 
-    o70_flow_t * * flow_pp,
+    o70_world_t * w,
+    o70_flow_t * * flow_ptr,
     uint32_t max_stack_depth
 )
 {
     (void) w;
-    (void) flow_pp;
+    (void) flow_ptr;
     (void) max_stack_depth;
     return O70S_TODO;
 }
 
 /* o70_flow_destroy *********************************************************/
-O70_API o70_status_t o70_flow_destroy (o70_flow_t * flow)
+O70_API o70_status_t C42_CALL o70_flow_destroy (o70_flow_t * flow)
 {
     (void) flow;
     return O70S_TODO;

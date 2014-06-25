@@ -13,7 +13,7 @@ AR:=$(TCPFX)ar
 STRIP:=$(TCPFX)strip
 CFG:=$(or $(CFG),release)
 O:=$(DEVDIR)/$(TARGET)-$(CFG)
-B:=/tmp/$(shell whoami)-$(TARGET)-$(CFG)-$N
+B:=/tmp/$(shell whoami)-build/$(TARGET)-$(CFG)-$N
 LIBPFX:=$(if $(findstring mingw,$(CC)),,lib)
 LIBEXT:=$(if $(findstring mingw,$(CC)),.dll,.so)
 EXEEXT:=$(if $(findstring mingw,$(CC)),.exe,)
@@ -24,6 +24,7 @@ SLIB:=$B/lib$(N).a
 DCLI:=$(B)/$(N)
 SCLI:=$(B)/$(N)s
 CF:=-std=c99 -Wall -Werror -Wextra -fvisibility=hidden -I$(O)/include
+LF:=$(and $(findstring mingw,$(TARGET)),-mconsole -municode)
 LIBCF:=$(CF)
 DLIBCF:=$(LIBCF) -fpic -D$D_LIB_BUILD
 SLIBCF:=$(LIBCF) -D$D_STATIC
@@ -77,8 +78,8 @@ $(patsubst %.c,$B/%-sta.o,$(LIBSRC)): $B/%-sta.o: %.c $N.h | $B
 	$(CC) -c -o $@ $< $(SLIBCF) $(CF_$(CFG))
 
 $(DCLI): cli.c $N.h $(DLIB) | $B
-	$(CC) -o $@ $< -I. $(CF) $(CF_$(CFG)) -L$O/lib -L$B -l:$(DLIB) -lc42clia -l:$(LIBPFX)c42svc$(LIBEXT) -l:$(LIBPFX)c42$(LIBEXT)
+	$(CC) $(LF) -o $@ $< -I. $(CF) $(CF_$(CFG)) -L$O/lib -L$B -l:$(DLIB) -lc42clia -l:$(LIBPFX)c42svc$(LIBEXT) -l:$(LIBPFX)c42$(LIBEXT)
 
 $(SCLI): cli.c $N.h $(SLIB) | $B
-	$(CC) -static -o $@ $< -D$D_STATIC -I. $(CF) $(CF_$(CFG)) -L$O/lib -L$B -l:$(SLIB) -lc42clia -lc42svc -lc42
+	$(CC) $(LF) -static -o $@ $< -D$D_STATIC -DC42_STATIC -DC42SVC_STATIC -I. $(CF) $(CF_$(CFG)) -L$O/lib -L$B -l:$(SLIB) -lc42clia -lc42svc -lc42
 
