@@ -66,8 +66,18 @@ O70_API o70_status_t C42_CALL o70_world_init
     o70_init_t * ini
 )
 {
-    (void) w;
-    (void) ini;
+    uint_fast8_t mae;
+
+    C42_VAR_CLEAR(*w);
+    w->ma = ini->ma;
+    w->in = ini->in;
+    w->out = ini->out;
+    w->err = ini->err;
+
+    mae = C42_MA_ARRAY_ALLOC(w->ma, w->ohdr, 
+                             1 << c42_u32_bit_width(O70X__COUNT));
+    if (mae) return mae == C42_MA_CORRUPT ? O70S_BUG : O70S_NO_MEM;
+
     return O70S_TODO;
 }
 

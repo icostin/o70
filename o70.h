@@ -297,7 +297,6 @@ struct o70_class_s
     o70_obj_finish_f finish; /**< finish callback */
     o70_obj_get_prop_f get_prop; /**< get property */
     o70_obj_set_prop_f set_prop; /**< set property */
-    /**< set property */
 
     void * finish_context; /**< context for o70_class_t#finish */
     void * prop_context;
@@ -536,6 +535,8 @@ enum o70_builtin_object_indexes
     O70X_CTSTRING_CLASS,
     O70X_EXCEPTION_CLASS,
     O70X_MODULE_CLASS,
+
+    O70X__COUNT /* Dracula ^..^ */
 };
 
 /* o70_lib_name *************************************************************/
@@ -569,7 +570,7 @@ O70_API o70_status_t C42_CALL o70_world_init
 /* o70_world_finish *********************************************************/
 /**
  *  Finishes a scripting instance.
- *  This should be called after a successful call to o70_world_init() and
+ *  This should be called after a successful call to o70_world_init() but
  *  it can safely be called multiple times after successful/unsuccessful calls
  *  to o70_world_init().
  *  @retval O70S_OK         everything went fine
