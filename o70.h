@@ -12,6 +12,13 @@
 #define O70_API C42_LIB_IMPORT
 #endif
 
+/* O70CFG_INIT_MOD_NUM ******************************************************/
+/**
+ *  Initial number of modules to allocate.
+ */
+#define O70CFG_INIT_MOD_NUM 4
+
+
 /* o70_status_t *************************************************************/
 /**
  *  Fast integer type to hold a status code.

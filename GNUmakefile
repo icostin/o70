@@ -27,7 +27,7 @@ CF:=-std=c99 -Wall -Werror -Wextra -fvisibility=hidden -I$(O)/include
 LF:=$(and $(findstring mingw,$(TARGET)),-mconsole -municode)
 LIBCF:=$(CF)
 DLIBCF:=$(LIBCF) -fpic -D$D_LIB_BUILD
-SLIBCF:=$(LIBCF) -D$D_STATIC
+SLIBCF:=$(LIBCF) -D$D_STATIC -DC42_STATIC
 
 ifeq ($(TARGET),i686-w64-mingw32)
 DLIBCF:=$(filter-out -fpic,$(DLIBCF))
@@ -36,7 +36,7 @@ endif
 CF_debug:=-O0 -D_DEBUG
 CF_release:=-O3 -ffast-math -fomit-frame-pointer -DNDEBUG
 
-LIBF:=$(and $(filter $(TARGET),x86_64-linux-gnu),-ffreestanding -nostdlib) -L$(O)/lib -lc42
+LIBF:=$(and $(filter $(TARGET),x86_64-linux-gnu),-ffreestanding -nostdlib) -L$(O)/lib -l:$(LIBPFX)c42$(LIBEXT)
 
 OK_MSG=[32mOK[0m
 FAILED_MSG=[31;1mFAILED[22m

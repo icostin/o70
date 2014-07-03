@@ -74,9 +74,11 @@ O70_API o70_status_t C42_CALL o70_world_init
     w->out = ini->out;
     w->err = ini->err;
 
-    mae = C42_MA_ARRAY_ALLOC(w->ma, w->ohdr, 
-                             1 << c42_u32_bit_width(O70X__COUNT));
+    w->om = 1 << c42_u32_bit_width(O70X__COUNT);
+    mae = C42_MA_ARRAY_ALLOC(w->ma, w->ohdr, w->om);
     if (mae) return mae == C42_MA_CORRUPT ? O70S_BUG : O70S_NO_MEM;
+    w->on = O70X__COUNT;
+    c42_upa_set(w->nfx + w->on, 0, w->om - w->on);
 
     return O70S_TODO;
 }
