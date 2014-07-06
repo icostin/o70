@@ -38,6 +38,7 @@ static uint_fast8_t C42_CALL run_test (c42_svc_t * svc, c42_clia_t * clia)
     if (e) return 0x40;
 
     C42_VAR_CLEAR(ini);
+    ini.ma = &svc->ma;
     e = o70_world_init(&w, &ini);
     if (e)
     {

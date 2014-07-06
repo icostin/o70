@@ -316,14 +316,12 @@ struct o70_class_s
 struct o70_ctstr_s
 {
     o70_ohdr_t ohdr; /**< object header */
-    uint8_t const * data; /**< string data pointer */
-    size_t len; /**< string length in bytes */
+    c42_u8an_t data; /**< string data (pointer & size) */
 };
 
 struct o70_id_s
 {
-    o70_ohdr_t ohdr; /**< object header */
-    o70_ref_t ctstr; /**< const string containing the name of the identifier */
+    o70_ctstr_t ctstr; /**< const string with the name of the identifier */
     c42_rbtree_node_t rbtn; /**< rbtree node */
 };
 
@@ -458,21 +456,25 @@ struct o70_world_s
     o70_class_t ctstring_class; /**< const string class */
     o70_class_t exception_class; /**< exception class */
     o70_class_t module_class; /**< module class */
-    o70_slim_obj_t null_id; /**< null id */
-    o70_slim_obj_t false_id; /**< false id */
-    o70_slim_obj_t true_id; /**< true id */
-    o70_class_t null_class_id; /**< null id */
-    o70_class_t bool_id; /**< bool id */
-    o70_class_t int_id; /**< int id */
-    o70_class_t object_id; /**< object id */
-    o70_class_t class_id; /**< class id */
-    o70_class_t id_id; /**< id id */
-    o70_class_t array_id; /**< array id */
-    o70_class_t function_id; /**< function id */
-    o70_class_t string_id; /**< string id */
-    o70_class_t ctstring_id; /**< const string id */
-    o70_class_t exception_id; /**< exception id */
-    o70_class_t module_id; /**< module id */
+    o70_id_t null_id; /**< null id */
+    o70_id_t false_id; /**< false id */
+    o70_id_t true_id; /**< true id */
+    o70_id_t null_class_id; /**< null id */
+    o70_id_t bool_id; /**< bool id */
+    o70_id_t int_id; /**< int id */
+    o70_id_t object_id; /**< object id */
+    o70_id_t class_id; /**< class id */
+    o70_id_t id_id; /**< id id */
+    o70_id_t array_id; /**< array id */
+    o70_id_t function_id; /**< function id */
+    o70_id_t string_id; /**< string id */
+    o70_id_t ctstring_id; /**< const string id */
+    o70_id_t exception_id; /**< exception id */
+    o70_id_t module_id; /**< module id */
+    o70_module_t mcore; /**< core module */
+
+    o70_pkstat_t aux_status; /**< aux status when the function returns the 
+                               "main" status */
 };
 /* o70_opcodes **************************************************************/
 /**
@@ -540,8 +542,24 @@ enum o70_builtin_object_indexes
     O70X_IDENTIFIER_CLASS,
     O70X_STRING_CLASS,
     O70X_CTSTRING_CLASS,
+    O70X_ID_CLASS,
     O70X_EXCEPTION_CLASS,
     O70X_MODULE_CLASS,
+    O70X_NULL_ID,
+    O70X_FALSE_ID,
+    O70X_TRUE_ID,
+    O70X_NULL_CLASS_ID,
+    O70X_BOOL_ID,
+    O70X_INT_ID,
+    O70X_OBJECT_ID,
+    O70X_CLASS_ID,
+    O70X_ID_ID,
+    O70X_ARRAY_ID,
+    O70X_FUNCTION_ID,
+    O70X_STRING_ID,
+    O70X_CTSTRING_ID,
+    O70X_EXCEPTION_ID,
+    O70X_MODULE_ID,
 
     O70X__COUNT /* Dracula ^..^ */
 };
