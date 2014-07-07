@@ -636,5 +636,21 @@ O70_API o70_status_t C42_CALL o70_flow_destroy
     o70_flow_t * flow
 );
 
+/* o70_id_from_ba ***********************************************************/
+/**
+ *  Create an identifier from byte array.
+ *  If the identifier is created it has a ref count of 2 (one ref from the cache
+ *  and one for the caller of this function) otherwise the ref count is 
+ *  incremented with 1.
+ */
+O70_API o70_status_t C42_CALL o70_id_from_ba
+(
+    o70_world_t * w,
+    o70_ref_t * ref,
+    uint8_t const * a,
+    size_t n,
+    int is_static
+);
+
 #endif
 
