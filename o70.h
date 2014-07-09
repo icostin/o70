@@ -18,6 +18,8 @@
  */
 #define O70CFG_INIT_MOD_NUM 4
 
+#define O70_RTOX(_ref) ((_ref) >> 1)
+#define O70_XTOR(_idx) (((_idx) << 1) | 1)
 
 /* o70_status_t *************************************************************/
 /**
@@ -65,8 +67,8 @@ typedef struct o70_init_s o70_init_t;
 /* o70_prop_node_t **********************************************************/
 /**
  *  Property node.
- *  This is a pair of (identifier, value) with indexing information for quick
- *  lookup.
+ *  This is a pair of (key, value) with indexing information for quick
+ *  lookup. The key is a ref to a ctstr object
  */
 typedef struct o70_prop_node_s o70_prop_node_t;
 
@@ -99,15 +101,9 @@ typedef struct o70_class_s o70_class_t;
 
 /* o70_ctstr_s **************************************************************/
 /**
- *  Constant string.
+ *  Constant str.
  */
 typedef struct o70_ctstr_s o70_ctstr_t;
-
-/* o70_id_t *****************************************************************/
-/**
- *  Identifier.
- */
-typedef struct o70_id_s o70_id_t;
 
 /* o70_array_t **************************************************************/
 /**
@@ -270,14 +266,14 @@ struct o70_ohdr_s
 
 struct o70_kv_s
 {
-    o70_ref_t id; /**< id */
+    o70_ref_t key; /**< key */
     o70_ref_t val; /**< value */
 };
 
 struct o70_prop_node_s
 {
-    o70_kv_t kv; /**< payload data (id + value) */
     c42_rbtree_node_t rbtn; /**< red/black tree node */
+    o70_kv_t kv; /**< payload data (id + value) */
 };
 
 struct o70_prop_bag_s
@@ -316,13 +312,7 @@ struct o70_class_s
 struct o70_ctstr_s
 {
     o70_ohdr_t ohdr; /**< object header */
-    c42_u8an_t data; /**< string data (pointer & size) */
-};
-
-struct o70_id_s
-{
-    o70_ctstr_t ctstr; /**< const string with the name of the identifier */
-    c42_rbtree_node_t rbtn; /**< rbtree node */
+    c42_u8an_t data; /**< str data (pointer & size) */
 };
 
 struct o70_array_s
@@ -420,11 +410,12 @@ struct o70_world_s
     union
     {
         o70_ohdr_t * * ohdr; /**< table to all object headers */
+        void * * ot; /**< object table - easy to cast */
         uintptr_t * nfx; /**< next free index table */
     };
     o70_module_t * * mod; /**< array of pointers to modules */
 
-    c42_rbtree_t idt; /**< tree of identifiers */
+    o70_prop_bag_t ics; /**< internalised constant strings */
 
     size_t on; /**< number of inited object entries */
     size_t om; /**< number of allocated object entries */
@@ -449,28 +440,26 @@ struct o70_world_s
     o70_class_t int_class; /**< int class */
     o70_class_t object_class; /**< object class */
     o70_class_t class_class; /**< class class */
-    o70_class_t id_class; /**< id class */
     o70_class_t array_class; /**< array class */
     o70_class_t function_class; /**< function class */
-    o70_class_t string_class; /**< string class */
-    o70_class_t ctstring_class; /**< const string class */
+    o70_class_t str_class; /**< str class */
+    o70_class_t ctstr_class; /**< const str class */
     o70_class_t exception_class; /**< exception class */
     o70_class_t module_class; /**< module class */
-    o70_id_t null_id; /**< null id */
-    o70_id_t false_id; /**< false id */
-    o70_id_t true_id; /**< true id */
-    o70_id_t null_class_id; /**< null id */
-    o70_id_t bool_id; /**< bool id */
-    o70_id_t int_id; /**< int id */
-    o70_id_t object_id; /**< object id */
-    o70_id_t class_id; /**< class id */
-    o70_id_t id_id; /**< id id */
-    o70_id_t array_id; /**< array id */
-    o70_id_t function_id; /**< function id */
-    o70_id_t string_id; /**< string id */
-    o70_id_t ctstring_id; /**< const string id */
-    o70_id_t exception_id; /**< exception id */
-    o70_id_t module_id; /**< module id */
+    o70_ctstr_t null_ctstr; /**< null ctstr */
+    o70_ctstr_t false_ctstr; /**< false ctstr */
+    o70_ctstr_t true_ctstr; /**< true ctstr */
+    o70_ctstr_t null_class_ctstr; /**< null ctstr */
+    o70_ctstr_t bool_ctstr; /**< bool ctstr */
+    o70_ctstr_t int_ctstr; /**< int ctstr */
+    o70_ctstr_t object_ctstr; /**< object ctstr */
+    o70_ctstr_t class_ctstr; /**< class ctstr */
+    o70_ctstr_t array_ctstr; /**< array ctstr */
+    o70_ctstr_t function_ctstr; /**< function ctstr */
+    o70_ctstr_t str_ctstr; /**< str ctstr */
+    o70_ctstr_t ctstr_ctstr; /**< ctstr ctstr */
+    o70_ctstr_t exception_ctstr; /**< exception ctstr */
+    o70_ctstr_t module_ctstr; /**< module ctstr */
     o70_module_t mcore; /**< core module */
 
     o70_pkstat_t aux_status; /**< aux status when the function returns the 
@@ -539,34 +528,31 @@ enum o70_builtin_object_indexes
     O70X_INT_CLASS,
     O70X_ARRAY_CLASS,
     O70X_FUNCTION_CLASS,
-    O70X_IDENTIFIER_CLASS,
-    O70X_STRING_CLASS,
-    O70X_CTSTRING_CLASS,
-    O70X_ID_CLASS,
+    O70X_STR_CLASS,
+    O70X_CTSTR_CLASS,
     O70X_EXCEPTION_CLASS,
     O70X_MODULE_CLASS,
-    O70X_NULL_ID,
-    O70X_FALSE_ID,
-    O70X_TRUE_ID,
-    O70X_NULL_CLASS_ID,
-    O70X_BOOL_ID,
-    O70X_INT_ID,
-    O70X_OBJECT_ID,
-    O70X_CLASS_ID,
-    O70X_ID_ID,
-    O70X_ARRAY_ID,
-    O70X_FUNCTION_ID,
-    O70X_STRING_ID,
-    O70X_CTSTRING_ID,
-    O70X_EXCEPTION_ID,
-    O70X_MODULE_ID,
+    O70X_NULL_CTSTR,
+    O70X_FALSE_CTSTR,
+    O70X_TRUE_CTSTR,
+    O70X_NULL_CLASS_CTSTR,
+    O70X_BOOL_CTSTR,
+    O70X_INT_CTSTR,
+    O70X_OBJECT_CTSTR,
+    O70X_CLASS_CTSTR,
+    O70X_ARRAY_CTSTR,
+    O70X_FUNCTION_CTSTR,
+    O70X_STR_CTSTR,
+    O70X_CTSTR_CTSTR,
+    O70X_EXCEPTION_CTSTR,
+    O70X_MODULE_CTSTR,
 
     O70X__COUNT /* Dracula ^..^ */
 };
 
 /* o70_lib_name *************************************************************/
 /**
- *  Returns a static string identifying the library with its configuration.
+ *  Returns a static str identifying the library with its configuration.
  */
 O70_API uint8_t const * C42_CALL o70_lib_name ();
 
@@ -636,20 +622,17 @@ O70_API o70_status_t C42_CALL o70_flow_destroy
     o70_flow_t * flow
 );
 
-/* o70_id_from_ba ***********************************************************/
+/* o70_ctstr_intern *********************************************************/
 /**
- *  Create an identifier from byte array.
- *  If the identifier is created it has a ref count of 2 (one ref from the cache
- *  and one for the caller of this function) otherwise the ref count is 
- *  incremented with 1.
+ *  Returns the 'internalised' constant string.
+ *  Internalised strings have the property that if 2 strings have the same
+ *  content then their internalised strings are the same object.
  */
-O70_API o70_status_t C42_CALL o70_id_from_ba
+O70_API o70_status_t C42_CALL o70_ctstr_intern
 (
     o70_world_t * w,
-    o70_ref_t * ref,
-    uint8_t const * a,
-    size_t n,
-    int is_static
+    o70_ref_t * out,
+    o70_ref_t in
 );
 
 #endif
