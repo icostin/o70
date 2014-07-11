@@ -3,7 +3,6 @@
 
 #include <c42.h>
 
-
 #if O70_STATIC
 #define O70_API
 #elif O70_LIB_BUILD
@@ -18,8 +17,22 @@
  */
 #define O70CFG_INIT_MOD_NUM 4
 
+/* O70_RTOX *****************************************************************/
+/**
+ *  converts an object reference to object index.
+ */
 #define O70_RTOX(_ref) ((_ref) >> 1)
+/* O70_XTOR *****************************************************************/
+/**
+ *  Converts an object index to an object reference.
+ */
 #define O70_XTOR(_idx) (((_idx) << 1) | 1)
+
+/* O70_IS_OREF **************************************************************/
+/**
+ *  Returns true only if the given reference points to a regular object.
+ */
+#define O70_IS_OREF(_ref) (!((_ref) & 1))
 
 /* o70_status_t *************************************************************/
 /**
@@ -191,7 +204,7 @@ typedef o70_status_t (C42_CALL * o70_obj_init_f)
  */
 typedef o70_status_t (C42_CALL * o70_obj_finish_f)
     (
-        o70_flow_t * flow,
+        o70_world_t * w,
         o70_ref_t obj
     );
 
@@ -205,26 +218,26 @@ typedef o70_status_t (C42_CALL * o70_obj_finish_f)
 typedef o70_status_t (C42_CALL * o70_obj_get_prop_f)
     (
         o70_flow_t * flow,
-        o70_ref_t obj, 
-        o70_ref_t prop_id, 
-        o70_ref_t * value_ptr, 
+        o70_ref_t obj,
+        o70_ref_t prop_id,
+        o70_ref_t * value_ptr,
         void * context
     );
 
 /* o70_obj_set_prop_f *******************************************************/
 /**
  *  Sets an object property.
- *  For primitive objects this usually updates the object instance and 
+ *  For primitive objects this usually updates the object instance and
  *  returns #O70S_OK.
  *  In more complex scenarios this can push a function call in the execution
  *  stack and return #O70S_PENDING.
  */
-typedef o70_status_t (C42_CALL * o70_obj_set_prop_f) 
+typedef o70_status_t (C42_CALL * o70_obj_set_prop_f)
     (
         o70_flow_t * flow,
-        o70_ref_t obj, 
-        o70_ref_t prop_id, 
-        o70_ref_t value, 
+        o70_ref_t obj,
+        o70_ref_t prop_id,
+        o70_ref_t value,
         void * context
     );
 
@@ -260,7 +273,11 @@ struct o70_init_s
 
 struct o70_ohdr_s
 {
-    uint32_t ref_count; /**< number of references to the object */
+    union
+    {
+        uint32_t nref; /**< number of references to the object */
+        uint32_t ndx; /**< next destryo index */
+    };
     uint32_t class_ox; /**< object index for current object's class */
 };
 
@@ -346,7 +363,7 @@ struct o70_struct_class_s
 {
     o70_class_t cls; /**< class data */
     o70_prop_bag_t named_slots; /**< key: ids, value: slot indexes */
-    size_t num_slots; /**< number of slots; deducible also from 
+    size_t num_slots; /**< number of slots; deducible also from
                             cls.instance_size */
 };
 
@@ -386,15 +403,15 @@ struct o70_module_s
     uint32_t * aofs; /**< arg offsets */
     uint32_t * ia; /**< instruction args */
     uint32_t * ieh; /**< instruction exception handler */
-    uint32_t * ffix; /**< function body first instruction index 
+    uint32_t * ffix; /**< function body first instruction index
                             (nfb + 1 items) */
     o70_ref_t * fvcc; /**< function var-context class table; nf items */
     o70_ref_t * ct; /**< table of constants */
-    o70_ehi_t * ehi; /**< array of all items from all exception handlers; 
+    o70_ehi_t * ehi; /**< array of all items from all exception handlers;
                             has @anehi items */
-    uint32_t * ehc; /**< exception handler chain; 
+    uint32_t * ehc; /**< exception handler chain;
                           for each exception handler chain this points to the
-                          index of the first exc. handler item; 
+                          index of the first exc. handler item;
                           has nehc + 1 items */
     size_t ni; /**< number of instructions for all functions/code blocks */
     size_t na; /**< number of instruction arguments for all the code */
@@ -420,6 +437,9 @@ struct o70_world_s
     size_t on; /**< number of inited object entries */
     size_t om; /**< number of allocated object entries */
     size_t ffx; /**< first free index */
+    size_t fdx; /**< first destroy index; this is the head of the list of
+                  indices to objects to destroy; the indices are chained by
+                  using the nref */
 
     size_t mn; /**< number of used modules */
     size_t mm; /**< number of allocated modules */
@@ -462,7 +482,7 @@ struct o70_world_s
     o70_ctstr_t module_ctstr; /**< module ctstr */
     o70_module_t mcore; /**< core module */
 
-    o70_pkstat_t aux_status; /**< aux status when the function returns the 
+    o70_pkstat_t aux_status; /**< aux status when the function returns the
                                "main" status */
 };
 /* o70_opcodes **************************************************************/
@@ -507,7 +527,7 @@ enum o70_opcodes
 enum o70_statuses
 {
     O70S_OK = 0, /**< all ok */
-    O70S_PENDING, /**< operation is pending; more scripting code needs to be 
+    O70S_PENDING, /**< operation is pending; more scripting code needs to be
                     executed before completing the operation */
     O70S_BAD_ARG, /**< some argument or input field has an incorrect value */
     O70S_NO_MEM, /**< allocation failed */
@@ -634,6 +654,58 @@ O70_API o70_status_t C42_CALL o70_ctstr_intern
     o70_ref_t * out,
     o70_ref_t in
 );
+
+/* o70_ref_inc **************************************************************/
+/**
+ *  Increments the ref counter for the given object
+ */
+C42_INLINE void o70_ref_inc
+(
+    o70_world_t * w,
+    o70_ref_t oref
+)
+{
+    if (O70_IS_OREF(oref)) w->ohdr[O70_RTOX(oref)]->nref += 1;
+}
+
+O70_API o70_status_t C42_CALL _o70_obj_destroy (o70_world_t * w);
+
+/* o70_ref_dec **************************************************************/
+/**
+ *  Decrements the number of refs to the given object.
+ *  If there are no refs left, then the object will be destroyed.
+ *  Object destructors cannot 'call' interpreted code therefore there is no
+ *  need for a flow.
+ *  Destroying the current object may cause the destruction of other objects
+ *  however, no cycles can be created because the objects destroyed before 
+ *  had 0 refs (nobody still pointing to them).
+ *  TODO: this func should just queue the object in a destroy list and have 
+ *  another api for killing - this will avoid nesting too many calls on the
+ *  real stack
+ */
+C42_INLINE o70_status_t o70_ref_dec
+(
+    o70_world_t * w,
+    o70_ref_t oref
+)
+{
+    uint32_t ox;
+    o70_status_t st;
+
+    if (O70_IS_OREF(oref)) 
+    {
+        ox = O70_RTOX(oref);
+        if (!(w->ohdr[ox]->nref -= 1))
+        {
+            if (ox < O70X__COUNT) return O70S_BUG;
+            w->ohdr[ox]->ndx = w->fdx;
+            w->fdx = ox;
+            st = _o70_obj_destroy(w);
+            return st;
+        }
+    }
+    return 0;
+}
 
 #endif
 

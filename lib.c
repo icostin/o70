@@ -173,34 +173,34 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->ohdr[O70X_EXCEPTION_CTSTR ] = &w-> exception_ctstr.ohdr;
         w->ohdr[O70X_MODULE_CTSTR    ] = &w->    module_ctstr.ohdr;
 
-        w->        null_obj.ohdr.ref_count = 1;
-        w->       false_obj.ohdr.ref_count = 1;
-        w->        true_obj.ohdr.ref_count = 1;
-        w->      null_class.ohdr.ref_count = 1;
-        w->      bool_class.ohdr.ref_count = 1;
-        w->       int_class.ohdr.ref_count = 1;
-        w->    object_class.ohdr.ref_count = 1;
-        w->     class_class.ohdr.ref_count = 1;
-        w->     array_class.ohdr.ref_count = 1;
-        w->  function_class.ohdr.ref_count = 1;
-        w->       str_class.ohdr.ref_count = 1;
-        w->     ctstr_class.ohdr.ref_count = 1;
-        w-> exception_class.ohdr.ref_count = 1;
-        w->    module_class.ohdr.ref_count = 1;
-        w->      null_ctstr.ohdr.ref_count = 1;
-        w->     false_ctstr.ohdr.ref_count = 1;
-        w->      true_ctstr.ohdr.ref_count = 1;
-        w->null_class_ctstr.ohdr.ref_count = 1;
-        w->      bool_ctstr.ohdr.ref_count = 1;
-        w->       int_ctstr.ohdr.ref_count = 1;
-        w->    object_ctstr.ohdr.ref_count = 1;
-        w->     class_ctstr.ohdr.ref_count = 1;
-        w->     array_ctstr.ohdr.ref_count = 1;
-        w->  function_ctstr.ohdr.ref_count = 1;
-        w->       str_ctstr.ohdr.ref_count = 1;
-        w->     ctstr_ctstr.ohdr.ref_count = 1;
-        w-> exception_ctstr.ohdr.ref_count = 1;
-        w->    module_ctstr.ohdr.ref_count = 1;
+        w->        null_obj.ohdr.nref = 1;
+        w->       false_obj.ohdr.nref = 1;
+        w->        true_obj.ohdr.nref = 1;
+        w->      null_class.ohdr.nref = 1;
+        w->      bool_class.ohdr.nref = 1;
+        w->       int_class.ohdr.nref = 1;
+        w->    object_class.ohdr.nref = 1;
+        w->     class_class.ohdr.nref = 1;
+        w->     array_class.ohdr.nref = 1;
+        w->  function_class.ohdr.nref = 1;
+        w->       str_class.ohdr.nref = 1;
+        w->     ctstr_class.ohdr.nref = 1;
+        w-> exception_class.ohdr.nref = 1;
+        w->    module_class.ohdr.nref = 1;
+        w->      null_ctstr.ohdr.nref = 1;
+        w->     false_ctstr.ohdr.nref = 1;
+        w->      true_ctstr.ohdr.nref = 1;
+        w->null_class_ctstr.ohdr.nref = 1;
+        w->      bool_ctstr.ohdr.nref = 1;
+        w->       int_ctstr.ohdr.nref = 1;
+        w->    object_ctstr.ohdr.nref = 1;
+        w->     class_ctstr.ohdr.nref = 1;
+        w->     array_ctstr.ohdr.nref = 1;
+        w->  function_ctstr.ohdr.nref = 1;
+        w->       str_ctstr.ohdr.nref = 1;
+        w->     ctstr_ctstr.ohdr.nref = 1;
+        w-> exception_ctstr.ohdr.nref = 1;
+        w->    module_ctstr.ohdr.nref = 1;
 
         w->        null_obj.ohdr.class_ox = O70X_NULL_CLASS;
         w->       false_obj.ohdr.class_ox = O70X_BOOL_CLASS;
@@ -284,6 +284,23 @@ O70_API o70_status_t C42_CALL o70_world_finish
     }
 
     return rs;
+}
+
+/* _o70_obj_destroy *********************************************************/
+O70_API o70_status_t C42_CALL _o70_obj_destroy (o70_world_t * w)
+{
+    uint32_t dx;
+    o70_class_t * c;
+    o70_status_t st;
+
+    while ((dx = w->fdx))
+    {
+        w->fdx = w->ohdr[dx]->ndx;
+        c = w->ot[w->ohdr[dx]->class_ox];
+        st = c->finish(w, dx);
+        if (st) return st;
+    }
+    return 0;
 }
 
 /* o70_flow_create **********************************************************/
