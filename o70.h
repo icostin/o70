@@ -51,6 +51,12 @@ typedef uint8_t o70_pkstat_t;
  */
 typedef uint32_t o70_ref_t;
 
+/* o70_oidx_t ***************************************************************/
+/**
+ *  Integer type to hold an object index.
+ */
+typedef uint32_t o70_oidx_t;
+
 /* o70_world_t **************************************************************/
 /**
  *  The root structure describing a scripting instance.
@@ -112,7 +118,7 @@ typedef struct o70_object_s o70_object_t;
  */
 typedef struct o70_class_s o70_class_t;
 
-/* o70_ctstr_s **************************************************************/
+/* o70_ctstr_t **************************************************************/
 /**
  *  Constant str.
  */
@@ -464,6 +470,7 @@ struct o70_world_s
     o70_class_t function_class; /**< function class */
     o70_class_t str_class; /**< str class */
     o70_class_t ctstr_class; /**< const str class */
+    o70_class_t actstr_class; /**< allocated const str class */
     o70_class_t exception_class; /**< exception class */
     o70_class_t module_class; /**< module class */
     o70_ctstr_t null_ctstr; /**< null ctstr */
@@ -478,6 +485,7 @@ struct o70_world_s
     o70_ctstr_t function_ctstr; /**< function ctstr */
     o70_ctstr_t str_ctstr; /**< str ctstr */
     o70_ctstr_t ctstr_ctstr; /**< ctstr ctstr */
+    o70_ctstr_t actstr_ctstr; /**< actstr ctstr */
     o70_ctstr_t exception_ctstr; /**< exception ctstr */
     o70_ctstr_t module_ctstr; /**< module ctstr */
     o70_module_t mcore; /**< core module */
@@ -531,6 +539,7 @@ enum o70_statuses
                     executed before completing the operation */
     O70S_BAD_ARG, /**< some argument or input field has an incorrect value */
     O70S_NO_MEM, /**< allocation failed */
+    O70S_IO_ERROR, /**< I/O error */
 
     O70S_BUG = 0x70,
     O70S_TODO,
@@ -550,6 +559,7 @@ enum o70_builtin_object_indexes
     O70X_FUNCTION_CLASS,
     O70X_STR_CLASS,
     O70X_CTSTR_CLASS,
+    O70X_ACTSTR_CLASS,
     O70X_EXCEPTION_CLASS,
     O70X_MODULE_CLASS,
     O70X_NULL_CTSTR,
@@ -564,6 +574,7 @@ enum o70_builtin_object_indexes
     O70X_FUNCTION_CTSTR,
     O70X_STR_CTSTR,
     O70X_CTSTR_CTSTR,
+    O70X_ACTSTR_CTSTR,
     O70X_EXCEPTION_CTSTR,
     O70X_MODULE_CTSTR,
 
@@ -655,6 +666,45 @@ O70_API o70_status_t C42_CALL o70_ctstr_intern
     o70_ref_t in
 );
 
+/* o70_static_ctstr *********************************************************/
+/**
+ *  Allocates a new static constant string object.
+ */
+O70_API o70_status_t C42_CALL o70_static_ctstr
+(
+    o70_world_t * w,
+    o70_ref_t * out,
+    void const * ptr,
+    size_t len
+);
+
+/* O70_SCS ******************************************************************/
+/**
+ *  Creates a static constant string from a given string literal.
+ */
+#define O70_SCS(_w, _ref_ptr, _str_lit) \
+    (o70_static_ctstr((_w), (_ref_ptr), (_str_lit), sizeof(_str_lit) - 1))
+
+/* o70_static_ctstr_intern **************************************************/
+/**
+ *  Given a static byte buffer it returns an internalized ctstr object.
+ */
+O70_API o70_status_t C42_CALL o70_static_ctstr_intern
+(
+    o70_world_t * w,
+    o70_ref_t * out,
+    void const * ptr,
+    size_t len
+);
+
+/* O70_ISCS *****************************************************************/
+/**
+ *  internalised static const string.
+ */
+#define O70_ISCS(_w, _ref_ptr, _str_lit) \
+    (o70_static_ctstr_intern((_w), (_ref_ptr), \
+                             (_str_lit), sizeof(_str_lit) - 1))
+
 /* o70_ref_inc **************************************************************/
 /**
  *  Increments the ref counter for the given object
@@ -706,6 +756,16 @@ C42_INLINE o70_status_t o70_ref_dec
     }
     return 0;
 }
+
+/* o70_dump_icst ************************************************************/
+/**
+ *  Dumps in escaped form all items from the internalised constant strings tree
+ */
+O70_API o70_status_t C42_CALL o70_dump_icst
+(
+    o70_world_t * w,
+    c42_io8_t * o
+);
 
 #endif
 

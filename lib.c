@@ -3,6 +3,17 @@
 #define L(...) (c42_io8_fmt(w->err, __VA_ARGS__))
 //#define L(...) 
 
+/* obj_alloc ****************************************************************/
+/**
+ *  Allocates an object.
+ */
+static o70_status_t C42_CALL obj_alloc
+(
+    o70_world_t * w,
+    o70_oidx_t * out,
+    size_t size
+);
+
 /* o70_lib_name *************************************************************/
 O70_API uint8_t const * C42_CALL o70_lib_name ()
 {
@@ -156,6 +167,7 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->ohdr[O70X_FUNCTION_CLASS  ] = &w->  function_class.ohdr;
         w->ohdr[O70X_STR_CLASS       ] = &w->       str_class.ohdr;
         w->ohdr[O70X_CTSTR_CLASS     ] = &w->     ctstr_class.ohdr;
+        w->ohdr[O70X_ACTSTR_CLASS    ] = &w->    actstr_class.ohdr;
         w->ohdr[O70X_EXCEPTION_CLASS ] = &w-> exception_class.ohdr;
         w->ohdr[O70X_MODULE_CLASS    ] = &w->    module_class.ohdr;
         w->ohdr[O70X_NULL_CTSTR      ] = &w->      null_ctstr.ohdr;
@@ -170,6 +182,7 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->ohdr[O70X_FUNCTION_CTSTR  ] = &w->  function_ctstr.ohdr;
         w->ohdr[O70X_STR_CTSTR       ] = &w->       str_ctstr.ohdr;
         w->ohdr[O70X_CTSTR_CTSTR     ] = &w->     ctstr_ctstr.ohdr;
+        w->ohdr[O70X_ACTSTR_CTSTR    ] = &w->    actstr_ctstr.ohdr;
         w->ohdr[O70X_EXCEPTION_CTSTR ] = &w-> exception_ctstr.ohdr;
         w->ohdr[O70X_MODULE_CTSTR    ] = &w->    module_ctstr.ohdr;
 
@@ -199,6 +212,7 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->  function_ctstr.ohdr.nref = 1;
         w->       str_ctstr.ohdr.nref = 1;
         w->     ctstr_ctstr.ohdr.nref = 1;
+        w->    actstr_ctstr.ohdr.nref = 1;
         w-> exception_ctstr.ohdr.nref = 1;
         w->    module_ctstr.ohdr.nref = 1;
 
@@ -228,6 +242,7 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->  function_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
         w->       str_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
         w->     ctstr_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
+        w->    actstr_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
         w-> exception_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
         w->    module_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
 
@@ -249,6 +264,7 @@ O70_API o70_status_t C42_CALL o70_world_init
         A(O70X_FUNCTION_CTSTR  ,   function_ctstr, "function"     );
         A(O70X_STR_CTSTR       ,        str_ctstr, "str"          );
         A(O70X_CTSTR_CTSTR     ,      ctstr_ctstr, "ctstr"        );
+        A(O70X_ACTSTR_CTSTR    ,     actstr_ctstr, "actstr"       );
         A(O70X_EXCEPTION_CTSTR ,  exception_ctstr, "exception"    );
         A(O70X_MODULE_CTSTR    ,     module_ctstr, "module"       );
         r = 0;
@@ -286,6 +302,21 @@ O70_API o70_status_t C42_CALL o70_world_finish
     return rs;
 }
 
+/* obj_alloc ****************************************************************/
+static o70_status_t C42_CALL obj_alloc
+(
+    o70_world_t * w,
+    o70_oidx_t * out,
+    size_t size
+)
+{
+    (void) w;
+    (void) out;
+    (void) size;
+    return O70S_TODO;
+}
+
+
 /* _o70_obj_destroy *********************************************************/
 O70_API o70_status_t C42_CALL _o70_obj_destroy (o70_world_t * w)
 {
@@ -321,6 +352,84 @@ O70_API o70_status_t C42_CALL o70_flow_create
 O70_API o70_status_t C42_CALL o70_flow_destroy (o70_flow_t * flow)
 {
     (void) flow;
+    return O70S_TODO;
+}
+
+/* o70_dump_icst ************************************************************/
+O70_API o70_status_t C42_CALL o70_dump_icst
+(
+    o70_world_t * w,
+    c42_io8_t * o
+)
+{
+    uint_fast8_t e;
+    c42_rbtree_path_t path;
+    c42_rbtree_node_t * n;
+    o70_prop_node_t * pn;
+    o70_ctstr_t * cs;
+
+    for (n = c42_rbtree_first(&path, &w->ics.rbt);
+         n;
+         n = c42_rbtree_np(&path, C42_RBTREE_MORE))
+    {
+        pn = (o70_prop_node_t *) n;
+        cs = w->ot[O70_RTOX(pn->kv.key)];
+        e = c42_io8_fmt(o, "$.*es\n", cs->data.n, cs->data.a);
+        if (e) L("o70_dump_icst: print failed: $b\n", e);
+        if (e) return O70S_IO_ERROR;
+    }
+    return 0;
+}
+
+/* o70_static_ctstr *********************************************************/
+O70_API o70_status_t C42_CALL o70_static_ctstr
+(
+    o70_world_t * w,
+    o70_ref_t * out,
+    void const * ptr,
+    size_t len
+)
+{
+    o70_status_t os;
+    o70_oidx_t x;
+    o70_ctstr_t * cs;
+    os = obj_alloc(w, &x, sizeof(o70_ctstr_t));
+    if (os) return os;
+    cs = w->ot[x];
+    cs->data.a = (uint8_t *) ptr;
+    cs->data.n = len;
+    *out = O70_XTOR(x);
+    return 0;
+}
+
+/* o70_static_ctstr_intern **************************************************/
+O70_API o70_status_t C42_CALL o70_static_ctstr_intern
+(
+    o70_world_t * w,
+    o70_ref_t * out,
+    void const * ptr,
+    size_t len
+)
+{
+    // c42_rbtree_path_t path;
+    // c42_u8an_t ba;
+    // uint_fast8_t rbte;
+    (void) w;
+    (void) out;
+    (void) ptr;
+    (void) len;
+    // /* init a byte array to use it as lookup key in the tree of internalised
+    //  * constant strings */
+    // ba.a = (void *) ptr;
+    // ba.n = len;
+
+    // /* now do the lookup */
+    // rbte = c42_rbtree_find(&path, &w->ics.rbt, (uintptr_t) &ba);
+    // if (rbte == C42_RBTREE_FOUND)
+    //     w->_id.data.a = (uint8_t *) (_str); w->_id.data.n = sizeof(_str) - 1; 
+    //     rbte = c42_rbtree_find(&path, &w->ics.rbt, (uintptr_t) &w->_id.data); 
+    //     if (rbte != C42_RBTREE_NOT_FOUND) { r = O70S_BUG; break; } 
+    //     if ((r = ics_node_create(w, &path, O70_XTOR((_x))))) break; 
     return O70S_TODO;
 }
 

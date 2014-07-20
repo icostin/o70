@@ -19,7 +19,29 @@ uint_fast8_t C42_CALL c42_main
 /* test1 ********************************************************************/
 static uint_fast8_t C42_CALL test1 (o70_world_t * w)
 {
-    (void) w;
+    o70_status_t os;
+    o70_ref_t r;
+
+    os = O70_SCS(w, &r, "jeton");
+    if (os)
+    {
+        c42_io8_fmt(w->err, "test1: failed creating static constant string "
+                    "'jeton': $s = $b\n", o70_status_name(os), os);
+        return 1;
+    }
+
+    os = O70_ISCS(w, &r, "beton");
+    if (os)
+    {
+        c42_io8_fmt(w->err, "test1: failed creating internalised static "
+                    "constant string 'beton': $s = $b\n", o70_status_name(os),
+                    os);
+        return 1;
+    }
+
+    os = o70_dump_icst(w, w->out);
+    if (os) return 1;
+
     return 0;
 }
 
@@ -52,6 +74,7 @@ static uint_fast8_t C42_CALL run_test (c42_svc_t * svc, c42_clia_t * clia)
     do
     {
         r = test1(&w);
+        if (r) c42_io8_fmt(err, "o70 test: test #1 failed\n");
     }
     while (0);
 
