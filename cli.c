@@ -30,6 +30,13 @@ static uint_fast8_t C42_CALL test1 (o70_world_t * w)
         return 1;
     }
 
+    os = o70_ref_dec(w, r);
+    if (os)
+    {
+        c42_io8_fmt(w->err, "test1: failed dereferencing 'jeton'\n");
+        return 1;
+    }
+
     os = O70_ISCS(w, &r, "beton");
     if (os)
     {

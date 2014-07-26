@@ -1,7 +1,17 @@
 #include "intern.h"
 
 #define L(...) (c42_io8_fmt(w->err, __VA_ARGS__))
-//#define L(...) 
+//#define L(...)
+
+/* ox_alloc *****************************************************************/
+/**
+ *  Object index alloc.
+ */
+static o70_status_t C42_CALL ox_alloc
+(
+    o70_world_t * restrict w,
+    o70_oidx_t * restrict ox
+);
 
 /* obj_alloc ****************************************************************/
 /**
@@ -9,9 +19,9 @@
  */
 static o70_status_t C42_CALL obj_alloc
 (
-    o70_world_t * w,
-    o70_oidx_t * out,
-    size_t size
+    o70_world_t * restrict w,
+    o70_oidx_t * restrict out,
+    o70_oidx_t clox
 );
 
 /* o70_lib_name *************************************************************/
@@ -93,7 +103,7 @@ static uint_fast8_t C42_CALL ics_key_cmp
     //pn = C42_STRUCT_FROM_FIELD_PTR(o70_prop_node_t, rbtn, node);
     cs = w->ot[O70_RTOX(pn->kv.key)];
 
-    if (key_str->n != cs->data.n) 
+    if (key_str->n != cs->data.n)
         return key_str->n < cs->data.n ? C42_RBTREE_LESS : C42_RBTREE_MORE;
     c = c42_u8a_cmp(key_str->a, cs->data.a, key_str->n);
     if (c) return c < 0 ? C42_RBTREE_LESS : C42_RBTREE_MORE;
@@ -111,7 +121,7 @@ static uint_fast8_t C42_CALL ics_key_cmp
 {
     o70_prop_node_t * node;
     int mae;
-    mae = C42_MA_VAR_ALLOC(w->ma, node);
+    mae = C42_MA_VAR_ALLOC(&w->ma, node);
     //L("prop_node alloc: $xp (mae=$i)\n", node, mae);
     if (mae) return mae == C42_MA_CORRUPT ? O70S_BUG : O70S_NO_MEM;
     if (!node) return O70S_BUG;
@@ -136,21 +146,34 @@ O70_API o70_status_t C42_CALL o70_world_init
 
     do
     {
-        w->ma = ini->ma;
         w->in = ini->in;
         w->out = ini->out;
         w->err = ini->err;
         //L("world init\n");
 
+        L("t=$x/4z, b=$x/4z, c=$x/4z\n", 
+                       ini->ma_total_limit && ini->ma_total_limit < SIZE_MAX
+                       ? (size_t) ini->ma_total_limit : SIZE_MAX,
+                       ini->ma_block_limit && ini->ma_block_limit < SIZE_MAX
+                       ? (size_t) ini->ma_block_limit : SIZE_MAX,
+                       ini->ma_count_limit && ini->ma_count_limit < SIZE_MAX
+                       ? (size_t) ini->ma_count_limit : SIZE_MAX);
+        c42_malim_init(&w->ma, &w->mactx, ini->ma,
+                       ini->ma_total_limit && ini->ma_total_limit < SIZE_MAX
+                       ? (size_t) ini->ma_total_limit : SIZE_MAX,
+                       ini->ma_block_limit && ini->ma_block_limit < SIZE_MAX
+                       ? (size_t) ini->ma_block_limit : SIZE_MAX,
+                       ini->ma_count_limit && ini->ma_count_limit < SIZE_MAX
+                       ? (size_t) ini->ma_count_limit : SIZE_MAX);
         w->om = 1 << c42_u32_bit_width(O70X__COUNT);
-        mae = C42_MA_ARRAY_ALLOC(w->ma, w->ohdr, w->om);
+        mae = C42_MA_ARRAY_ALLOC(&w->ma, w->ohdr, w->om);
         if (mae) { r = mae == C42_MA_CORRUPT ? O70S_BUG : O70S_NO_MEM; break; }
         w->ffx = w->on = O70X__COUNT;
         c42_upa_set(w->nfx + w->on, 0, w->om - w->on); /* CRASH */
 
         w->mn = 0;
         w->mm = O70CFG_INIT_MOD_NUM;
-        mae = C42_MA_ARRAY_ALLOC(w->ma, w->mod, w->mm);
+        mae = C42_MA_ARRAY_ALLOC(&w->ma, w->mod, w->mm);
         if (mae) { r = mae == C42_MA_CORRUPT ? O70S_BUG : O70S_NO_MEM; break; }
         w->mod[0] = &w->mcore;
 
@@ -250,7 +273,7 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->_id.data.a = (uint8_t *) (_str); w->_id.data.n = sizeof(_str) - 1; \
         rbte = c42_rbtree_find(&path, &w->ics.rbt, (uintptr_t) &w->_id.data); \
         if (rbte != C42_RBTREE_NOT_FOUND) { r = O70S_BUG; break; } \
-        if ((r = ics_node_create(w, &path, O70_XTOR((_x))))) break; 
+        if ((r = ics_node_create(w, &path, O70_XTOR((_x))))) break;
 
         A(O70X_NULL_CTSTR      ,       null_ctstr, "null"         );
         A(O70X_FALSE_CTSTR     ,      false_ctstr, "false"        );
@@ -267,6 +290,20 @@ O70_API o70_status_t C42_CALL o70_world_init
         A(O70X_ACTSTR_CTSTR    ,     actstr_ctstr, "actstr"       );
         A(O70X_EXCEPTION_CTSTR ,  exception_ctstr, "exception"    );
         A(O70X_MODULE_CTSTR    ,     module_ctstr, "module"       );
+#undef A
+
+        w->      null_class.isize = sizeof(o70_slim_obj_t   );
+        w->      bool_class.isize = sizeof(o70_slim_obj_t   );
+        w->       int_class.isize = sizeof(o70_slim_obj_t   );
+        w->    object_class.isize = sizeof(o70_slim_obj_t   );
+        w->     class_class.isize = sizeof(o70_class_t      );
+        w->     array_class.isize = sizeof(o70_array_t      );
+        w->  function_class.isize = sizeof(o70_function_t   );
+        w->       str_class.isize = sizeof(o70_str_t        );
+        w->     ctstr_class.isize = sizeof(o70_ctstr_t      );
+        w-> exception_class.isize = sizeof(o70_exception_t  );
+        w->    module_class.isize = sizeof(o70_module_t     );
+
         r = 0;
     }
     while (0);
@@ -287,14 +324,14 @@ O70_API o70_status_t C42_CALL o70_world_finish
 
     if (w->om)
     {
-        mae = C42_MA_ARRAY_FREE(w->ma, w->ohdr, w->om);
+        mae = C42_MA_ARRAY_FREE(&w->ma, w->ohdr, w->om);
         if (mae) return O70S_BUG;
         w->om = 0;
     }
 
     if (w->mm)
     {
-        mae = C42_MA_ARRAY_FREE(w->ma, w->mod, w->mm);
+        mae = C42_MA_ARRAY_FREE(&w->ma, w->mod, w->mm);
         if (mae) return O70S_BUG;
         w->mm = 0;
     }
@@ -302,35 +339,84 @@ O70_API o70_status_t C42_CALL o70_world_finish
     return rs;
 }
 
+/* ox_alloc *****************************************************************/
+static o70_status_t C42_CALL ox_alloc
+(
+    o70_world_t * restrict w,
+    o70_oidx_t * restrict ox
+)
+{
+    if (!w->ffx)
+    {
+        L("ox_alloc: need to realloc obj table\n");
+        return O70S_TODO;
+    }
+    w->ffx = w->nfx[*ox = w->ffx];
+    return 0;
+}
+
 /* obj_alloc ****************************************************************/
 static o70_status_t C42_CALL obj_alloc
 (
-    o70_world_t * w,
-    o70_oidx_t * out,
-    size_t size
+    o70_world_t * restrict w,
+    o70_oidx_t * restrict out,
+    o70_oidx_t clox
 )
 {
-    (void) w;
-    (void) out;
-    (void) size;
-    return O70S_TODO;
+    o70_ohdr_t * oh;
+    o70_class_t * cls;
+    o70_status_t os;
+    uint_fast8_t mae;
+    size_t ox;
+    os = ox_alloc(w, out);
+    if (os) return os;
+    ox = *out;
+    cls = w->ot[clox];
+    mae = c42_ma_alloc(&w->ma, w->ot + ox, 1, cls->isize);
+    L("obj_alloc: isize=$xz, mae=$i\n", cls->isize, mae);
+    if (mae) { return mae == C42_MA_CORRUPT ? O70S_BUG : O70S_NO_MEM; }
+    oh = w->ohdr[ox];
+    oh->nref = 1;
+    oh->class_ox = clox;
+    return 0;
 }
-
 
 /* _o70_obj_destroy *********************************************************/
 O70_API o70_status_t C42_CALL _o70_obj_destroy (o70_world_t * w)
 {
-    uint32_t dx;
+    uint32_t dx, fmx;
     o70_class_t * c;
+    o70_ohdr_t * oh;
     o70_status_t st;
+    uint_fast8_t mae;
 
+    fmx = 0;
     while ((dx = w->fdx))
     {
-        w->fdx = w->ohdr[dx]->ndx;
-        c = w->ot[w->ohdr[dx]->class_ox];
-        st = c->finish(w, dx);
-        if (st) return st;
+        L("obj_destroy: finishing ox=$xd\n", dx);
+        w->fdx = (oh = w->ohdr[dx])->ndx;
+        c = w->ot[oh->class_ox];
+        if (c->finish)
+        {
+            st = c->finish(w, dx);
+            if (st) return st;
+        }
+        oh->ndx = fmx;
+        fmx = dx;
     }
+    for (dx = fmx; dx; dx = fmx)
+    {
+        L("obj_destroy: freeing 0x=$xd\n", dx);
+        c = w->ot[(oh = w->ohdr[dx])->class_ox];
+        fmx = oh->ndx;
+        mae = c42_ma_free(&w->ma, oh, 1, c->isize);
+        if (mae)
+        {
+            L("obj_destroy: ma_free error $b\n", mae);
+            return O70S_BUG;
+        }
+    }
+
     return 0;
 }
 
@@ -393,7 +479,7 @@ O70_API o70_status_t C42_CALL o70_static_ctstr
     o70_status_t os;
     o70_oidx_t x;
     o70_ctstr_t * cs;
-    os = obj_alloc(w, &x, sizeof(o70_ctstr_t));
+    os = obj_alloc(w, &x, O70X_CTSTR_CLASS);
     if (os) return os;
     cs = w->ot[x];
     cs->data.a = (uint8_t *) ptr;
@@ -426,10 +512,10 @@ O70_API o70_status_t C42_CALL o70_static_ctstr_intern
     // /* now do the lookup */
     // rbte = c42_rbtree_find(&path, &w->ics.rbt, (uintptr_t) &ba);
     // if (rbte == C42_RBTREE_FOUND)
-    //     w->_id.data.a = (uint8_t *) (_str); w->_id.data.n = sizeof(_str) - 1; 
-    //     rbte = c42_rbtree_find(&path, &w->ics.rbt, (uintptr_t) &w->_id.data); 
-    //     if (rbte != C42_RBTREE_NOT_FOUND) { r = O70S_BUG; break; } 
-    //     if ((r = ics_node_create(w, &path, O70_XTOR((_x))))) break; 
+    //     w->_id.data.a = (uint8_t *) (_str); w->_id.data.n = sizeof(_str) - 1;
+    //     rbte = c42_rbtree_find(&path, &w->ics.rbt, (uintptr_t) &w->_id.data);
+    //     if (rbte != C42_RBTREE_NOT_FOUND) { r = O70S_BUG; break; }
+    //     if ((r = ics_node_create(w, &path, O70_XTOR((_x))))) break;
     return O70S_TODO;
 }
 

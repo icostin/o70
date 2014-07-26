@@ -26,7 +26,7 @@
 /**
  *  Converts an object index to an object reference.
  */
-#define O70_XTOR(_idx) (((_idx) << 1) | 1)
+#define O70_XTOR(_idx) (((_idx) << 1) | 0)
 
 /* O70_IS_OREF **************************************************************/
 /**
@@ -124,6 +124,12 @@ typedef struct o70_class_s o70_class_t;
  */
 typedef struct o70_ctstr_s o70_ctstr_t;
 
+/* o70_str_t ****************************************************************/
+/**
+ *  Byte String.
+ */
+typedef struct o70_str_s o70_str_t;
+
 /* o70_array_t **************************************************************/
 /**
  *  Array of object references.
@@ -183,6 +189,13 @@ typedef struct o70_ehi_s o70_ehi_t;
  *  Slim object (object without properties).
  */
 typedef struct o70_slim_obj_s o70_slim_obj_t;
+
+/* o70_exception_t **********************************************************/
+/**
+ *  Exception object
+ */
+typedef struct o70_exception_s o70_exception_t;
+
 
 #if 0
 /* o70_obj_init_f ***********************************************************/
@@ -268,7 +281,7 @@ struct o70_init_s
 {
     c42_ma_t * ma; /**< memory allocator */
 
-    uint64_t ma_total_limit; /**< max total memory to allocate */
+    uint64_t ma_total_limit; /**< max total memory to allocate; 0 means don't care */
     uint64_t ma_block_limit; /**< max size of any allocated block */
     uint64_t ma_count_limit; /**< max number of blocks to allocate */
 
@@ -282,7 +295,7 @@ struct o70_ohdr_s
     union
     {
         uint32_t nref; /**< number of references to the object */
-        uint32_t ndx; /**< next destryo index */
+        uint32_t ndx; /**< next destroy index */
     };
     uint32_t class_ox; /**< object index for current object's class */
 };
@@ -328,7 +341,7 @@ struct o70_class_s
     void * prop_context;
     /**< context for o70_class_t#get_prop and o70_class_t#set_prop */
 
-    // size_t instance_size; /**< size in bytes of instances */
+    size_t isize; /**< size in bytes of instances */
     // size_t class_size; /**< size in bytes of the class object */
 };
 
@@ -336,6 +349,13 @@ struct o70_ctstr_s
 {
     o70_ohdr_t ohdr; /**< object header */
     c42_u8an_t data; /**< str data (pointer & size) */
+};
+
+struct o70_str_s
+{
+    o70_ohdr_t ohdr; /**< object header */
+    c42_u8an_t data; /**< str data (pointer & size) */
+    size_t asize; /**< allocated size */
 };
 
 struct o70_array_s
@@ -363,6 +383,11 @@ struct o70_function_s
     o70_ref_t * iv; /**< inited arg values */
     size_t an; /**< number of arguments */
     size_t in; /**< number of inited args */
+};
+
+struct o70_exception_s
+{
+    o70_ohdr_t ohdr; /**< object header */
 };
 
 struct o70_struct_class_s
@@ -445,14 +470,15 @@ struct o70_world_s
     size_t ffx; /**< first free index */
     size_t fdx; /**< first destroy index; this is the head of the list of
                   indices to objects to destroy; the indices are chained by
-                  using the nref */
+                  using ohdr->nref/nfx */
 
     size_t mn; /**< number of used modules */
     size_t mm; /**< number of allocated modules */
 
     size_t fn; /**< number of flows */
 
-    c42_ma_t * ma; /**< memory allocator */
+    c42_ma_t ma; /**< memory allocator */
+    c42_malim_ctx_t mactx; /**< allocator context */
 
     c42_io8_t * in; /**< standard input */
     c42_io8_t * out; /**< standard output */
