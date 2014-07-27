@@ -168,7 +168,8 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->om = 1 << c42_u32_bit_width(O70X__COUNT);
         mae = C42_MA_ARRAY_ALLOC(&w->ma, w->ohdr, w->om);
         if (mae) { r = mae == C42_MA_CORRUPT ? O70S_BUG : O70S_NO_MEM; break; }
-        w->ffx = w->on = O70X__COUNT;
+        w->on = O70X__COUNT;
+        w->ffx = 0;
         c42_upa_set(w->nfx + w->on, 0, w->om - w->on); /* CRASH */
 
         w->mn = 0;
@@ -220,6 +221,7 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->     array_class.ohdr.nref = 1;
         w->  function_class.ohdr.nref = 1;
         w->       str_class.ohdr.nref = 1;
+        w->    actstr_class.ohdr.nref = 1;
         w->     ctstr_class.ohdr.nref = 1;
         w-> exception_class.ohdr.nref = 1;
         w->    module_class.ohdr.nref = 1;
@@ -251,6 +253,7 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->  function_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->       str_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->     ctstr_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->    actstr_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w-> exception_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->    module_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->      null_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
@@ -301,6 +304,7 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->  function_class.isize = sizeof(o70_function_t   );
         w->       str_class.isize = sizeof(o70_str_t        );
         w->     ctstr_class.isize = sizeof(o70_ctstr_t      );
+        w->    actstr_class.isize = sizeof(o70_ctstr_t      );
         w-> exception_class.isize = sizeof(o70_exception_t  );
         w->    module_class.isize = sizeof(o70_module_t     );
 
@@ -346,12 +350,26 @@ static o70_status_t C42_CALL ox_alloc
     o70_oidx_t * restrict ox
 )
 {
-    if (!w->ffx)
+    uint_fast8_t mae;
+    /* if there's a free index in the chain, return it and update the head */
+    if (w->ffx)
     {
-        L("ox_alloc: need to realloc obj table\n");
-        return O70S_TODO;
+        w->ffx = w->nfx[*ox = w->ffx];
+        return 0;
     }
-    w->ffx = w->nfx[*ox = w->ffx];
+    /* if all object entries are used then double the table */
+    if (w->on == w->om)
+    {
+        mae = C42_MA_ARRAY_DOUBLE(&w->ma, w->ot, w->om);
+        if (mae)
+        {
+            L("ox_alloc: ma double error: $b\n", mae);
+            return mae == C42_MA_CORRUPT ? O70S_BUG : O70S_NO_MEM;
+        }
+        w->om <<= 1;
+    }
+    /* return the first unused index */
+    *ox = w->on++;
     return 0;
 }
 
@@ -368,6 +386,7 @@ static o70_status_t C42_CALL obj_alloc
     o70_status_t os;
     uint_fast8_t mae;
     size_t ox;
+
     os = ox_alloc(w, out);
     if (os) return os;
     ox = *out;
@@ -467,8 +486,8 @@ O70_API o70_status_t C42_CALL o70_dump_icst
     return 0;
 }
 
-/* o70_static_ctstr *********************************************************/
-O70_API o70_status_t C42_CALL o70_static_ctstr
+/* o70_ctstr_static *********************************************************/
+O70_API o70_status_t C42_CALL o70_ctstr_static
 (
     o70_world_t * w,
     o70_ref_t * out,
@@ -477,19 +496,20 @@ O70_API o70_status_t C42_CALL o70_static_ctstr
 )
 {
     o70_status_t os;
-    o70_oidx_t x;
+    o70_oidx_t ox;
     o70_ctstr_t * cs;
-    os = obj_alloc(w, &x, O70X_CTSTR_CLASS);
+
+    os = obj_alloc(w, &ox, O70X_CTSTR_CLASS);
     if (os) return os;
-    cs = w->ot[x];
+    cs = w->ot[ox];
     cs->data.a = (uint8_t *) ptr;
     cs->data.n = len;
-    *out = O70_XTOR(x);
+    *out = O70_XTOR(ox);
     return 0;
 }
 
-/* o70_static_ctstr_intern **************************************************/
-O70_API o70_status_t C42_CALL o70_static_ctstr_intern
+/* o70_ctstr_static_intern **************************************************/
+O70_API o70_status_t C42_CALL o70_ctstr_static_intern
 (
     o70_world_t * w,
     o70_ref_t * out,
@@ -497,25 +517,43 @@ O70_API o70_status_t C42_CALL o70_static_ctstr_intern
     size_t len
 )
 {
-    // c42_rbtree_path_t path;
-    // c42_u8an_t ba;
-    // uint_fast8_t rbte;
-    (void) w;
-    (void) out;
-    (void) ptr;
-    (void) len;
-    // /* init a byte array to use it as lookup key in the tree of internalised
-    //  * constant strings */
-    // ba.a = (void *) ptr;
-    // ba.n = len;
+    c42_rbtree_path_t path;
+    o70_prop_node_t * pn;
+    c42_u8an_t ba;
+    uint_fast8_t rbte;
+    o70_status_t os, os2;
+    o70_ref_t r;
 
-    // /* now do the lookup */
-    // rbte = c42_rbtree_find(&path, &w->ics.rbt, (uintptr_t) &ba);
-    // if (rbte == C42_RBTREE_FOUND)
-    //     w->_id.data.a = (uint8_t *) (_str); w->_id.data.n = sizeof(_str) - 1;
-    //     rbte = c42_rbtree_find(&path, &w->ics.rbt, (uintptr_t) &w->_id.data);
-    //     if (rbte != C42_RBTREE_NOT_FOUND) { r = O70S_BUG; break; }
-    //     if ((r = ics_node_create(w, &path, O70_XTOR((_x))))) break;
-    return O70S_TODO;
+    /* init a byte array to use it as lookup key in the tree of internalised
+     * constant strings */
+    ba.a = (void *) ptr;
+    ba.n = len;
+
+    /* now do the lookup */
+    rbte = c42_rbtree_find(&path, &w->ics.rbt, (uintptr_t) &ba);
+    if (rbte == C42_RBTREE_FOUND)
+    {
+        /* found the node; the key of the node is the reference to our ctstr */
+        pn = (o70_prop_node_t *) path.nodes[path.last];
+        *out = pn->kv.key;
+        return 0;
+    }
+    /* ctstr not found, must create one */
+    os = o70_ctstr_static(w, out, ptr, len);
+    if (os) return os;
+    /* create the node in the internalised ctstr tree */
+    os = ics_node_create(w, &path, r = *out);
+    if (os)
+    {
+        /* failed to create the node */
+        if (os != O70S_BUG)
+        {
+            /* on non-buggy state, free the ctstr */
+            os2 = o70_ref_dec(w, r);
+            if (os2 == O70S_BUG) return os2;
+        }
+        return os;
+    }
+    return 0;
 }
 

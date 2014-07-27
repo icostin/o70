@@ -692,11 +692,11 @@ O70_API o70_status_t C42_CALL o70_ctstr_intern
     o70_ref_t in
 );
 
-/* o70_static_ctstr *********************************************************/
+/* o70_ctstr_static *********************************************************/
 /**
  *  Allocates a new static constant string object.
  */
-O70_API o70_status_t C42_CALL o70_static_ctstr
+O70_API o70_status_t C42_CALL o70_ctstr_static
 (
     o70_world_t * w,
     o70_ref_t * out,
@@ -709,13 +709,13 @@ O70_API o70_status_t C42_CALL o70_static_ctstr
  *  Creates a static constant string from a given string literal.
  */
 #define O70_SCS(_w, _ref_ptr, _str_lit) \
-    (o70_static_ctstr((_w), (_ref_ptr), (_str_lit), sizeof(_str_lit) - 1))
+    (o70_ctstr_static((_w), (_ref_ptr), (_str_lit), sizeof(_str_lit) - 1))
 
-/* o70_static_ctstr_intern **************************************************/
+/* o70_ctstr_static_intern **************************************************/
 /**
  *  Given a static byte buffer it returns an internalized ctstr object.
  */
-O70_API o70_status_t C42_CALL o70_static_ctstr_intern
+O70_API o70_status_t C42_CALL o70_ctstr_static_intern
 (
     o70_world_t * w,
     o70_ref_t * out,
@@ -728,7 +728,7 @@ O70_API o70_status_t C42_CALL o70_static_ctstr_intern
  *  internalised static const string.
  */
 #define O70_ISCS(_w, _ref_ptr, _str_lit) \
-    (o70_static_ctstr_intern((_w), (_ref_ptr), \
+    (o70_ctstr_static_intern((_w), (_ref_ptr), \
                              (_str_lit), sizeof(_str_lit) - 1))
 
 /* o70_ref_inc **************************************************************/
