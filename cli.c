@@ -20,17 +20,18 @@ uint_fast8_t C42_CALL c42_main
 static uint_fast8_t C42_CALL test1 (o70_world_t * w)
 {
     o70_status_t os;
-    o70_ref_t r;
+    o70_ref_t rj1, rj2, rb;
 
-    os = O70_SCS(w, &r, "jeton");
+    os = O70_SCS(w, &rj1, "jeton");
     if (os)
     {
         c42_io8_fmt(w->err, "test1: failed creating static constant string "
                     "'jeton': $s = $b\n", o70_status_name(os), os);
         return 1;
     }
+    c42_io8_fmt(w->out, "rj1: $xd\n", rj1);
 
-    os = O70_ISCS(w, &r, "beton");
+    os = O70_ISCS(w, &rb, "beton");
     if (os)
     {
         c42_io8_fmt(w->err, "test1: failed creating internalised static "
@@ -38,8 +39,9 @@ static uint_fast8_t C42_CALL test1 (o70_world_t * w)
                     os);
         return 1;
     }
+    c42_io8_fmt(w->out, "rb: $xd\n", rb);
 
-    os = O70_ISCS(w, &r, "jeton");
+    os = O70_ISCS(w, &rj2, "jeton");
     if (os)
     {
         c42_io8_fmt(w->err, "test1: failed creating internalised static "
@@ -47,11 +49,24 @@ static uint_fast8_t C42_CALL test1 (o70_world_t * w)
                     os);
         return 1;
     }
+    c42_io8_fmt(w->out, "rj2: $xd\n", rj2);
 
-    os = o70_ref_dec(w, r);
+    os = o70_ref_dec(w, rb);
+    if (os)
+    {
+        c42_io8_fmt(w->err, "test1: failed dereferencing 'beton'\n");
+        return 1;
+    }
+    os = o70_ref_dec(w, rj1);
     if (os)
     {
         c42_io8_fmt(w->err, "test1: failed dereferencing 'jeton'\n");
+        return 1;
+    }
+    os = o70_ref_dec(w, rj2);
+    if (os)
+    {
+        c42_io8_fmt(w->err, "test1: failed dereferencing intern 'jeton'\n");
         return 1;
     }
 

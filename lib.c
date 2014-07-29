@@ -127,6 +127,7 @@ static uint_fast8_t C42_CALL ics_key_cmp
     if (!node) return O70S_BUG;
     node->kv.val = node->kv.key = ctstr;
     c42_rbtree_insert(path, &node->rbtn);
+    o70_ref_inc(w, ctstr);
     return 0;
 }
 
@@ -535,7 +536,8 @@ O70_API o70_status_t C42_CALL o70_ctstr_static_intern
     {
         /* found the node; the key of the node is the reference to our ctstr */
         pn = (o70_prop_node_t *) path.nodes[path.last];
-        *out = pn->kv.key;
+        *out = r = pn->kv.key;
+        o70_ref_inc(w, r);
         return 0;
     }
     /* ctstr not found, must create one */
@@ -546,12 +548,10 @@ O70_API o70_status_t C42_CALL o70_ctstr_static_intern
     if (os)
     {
         /* failed to create the node */
-        if (os != O70S_BUG)
-        {
-            /* on non-buggy state, free the ctstr */
-            os2 = o70_ref_dec(w, r);
-            if (os2 == O70S_BUG) return os2;
-        }
+        if (os == O70S_BUG) return os;
+        /* on non-buggy state, free the ctstr */
+        os2 = o70_ref_dec(w, r);
+        if (os2 == O70S_BUG) return os2;
         return os;
     }
     return 0;
