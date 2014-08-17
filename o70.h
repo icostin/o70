@@ -11,6 +11,7 @@
 #define O70_API C42_LIB_IMPORT
 #endif
 
+/* defines {{{1 */
 /* O70CFG_INIT_MOD_NUM ******************************************************/
 /**
  *  Initial number of modules to allocate.
@@ -34,6 +35,108 @@
  */
 #define O70_IS_OREF(_ref) (!((_ref) & 1))
 
+/* Object model constants */
+#define O70M_OBJECT     (1 << 0) /**< regular object (with a property bag) */
+#define O70M_CLASS      (1 << 1) /**< class model */
+#define O70M_SCTSTR     (1 << 2) 
+#define O70M_ACTSTR     (1 << 3)
+#define O70M_ICTSTR     (1 << 4) 
+#define O70M_STR        (1 << 5) 
+#define O70M_ARRAY      (1 << 6) 
+#define O70M_FUNCTION   (1 << 7) 
+#define O70M_EXCEPTION  (1 << 8) 
+#define O70M_MODULE     (1 << 9)
+
+/* enums {{{1 */
+/* o70_opcodes **************************************************************/
+/**
+ *  Opcodes for the scripting VM.
+ *
+ * _lsx: local slot index
+ * _idcx: identifier const index
+ * _cbx: code block index
+ *
+ * resolve out_lsx, name_idcx
+ * fget val_lsx, obj_lsx, name_idcx
+ * fset val_lsx, obj_lsx, name_idcx
+ * aget val_lsx, arr_lsx, index_lsx
+ * aset val_lsx, arr_lsx, index_lsx
+ * call val_lsx, func_lsx, arg0_lsx, ...
+ * goto tgt_cbx
+ * branch cond_lsx, true_lsx, false_lsx
+ * ret val_lsx
+ * throw exc_lsx
+ */
+enum o70_opcodes
+{
+    O70O_COPY, // copy local var dest_lsx, src_lsx
+    O70O_PGET, // get from parent var context: depth, psx, lsx
+    O70O_PSET, // set var into parent var context: depth, psx, lsx
+    O70O_FGET, // field get
+    O70O_FSET,
+    O70O_AGET,
+    O70O_ASET,
+    O70O_CALL,
+    O70O_GOTO,
+    O70O_BRANCH,
+    O70O_RET,
+    O70O_THROW,
+};
+
+/* o70_statuses *************************************************************/
+/**
+ *  Status codes returned by functions in this library
+ */
+enum o70_statuses
+{
+    O70S_OK = 0, /**< all ok */
+    O70S_PENDING, /**< operation is pending; more scripting code needs to be
+                    executed before completing the operation */
+    O70S_BAD_ARG, /**< some argument or input field has an incorrect value */
+    O70S_NO_MEM, /**< allocation failed */
+    O70S_IO_ERROR, /**< I/O error */
+
+    O70S_BUG = 0x70,
+    O70S_TODO,
+};
+
+enum o70_builtin_object_indexes
+{
+    O70X_NULL,
+    O70X_FALSE,
+    O70X_TRUE,
+    O70X_OBJECT_CLASS,
+    O70X_CLASS_CLASS,
+    O70X_NULL_CLASS,
+    O70X_BOOL_CLASS,
+    O70X_INT_CLASS,
+    O70X_ARRAY_CLASS,
+    O70X_FUNCTION_CLASS,
+    O70X_STR_CLASS,
+    O70X_CTSTR_CLASS,
+    O70X_ACTSTR_CLASS,
+    O70X_EXCEPTION_CLASS,
+    O70X_MODULE_CLASS,
+    O70X_NULL_CTSTR,
+    O70X_FALSE_CTSTR,
+    O70X_TRUE_CTSTR,
+    O70X_NULL_CLASS_CTSTR,
+    O70X_BOOL_CTSTR,
+    O70X_INT_CTSTR,
+    O70X_OBJECT_CTSTR,
+    O70X_CLASS_CTSTR,
+    O70X_ARRAY_CTSTR,
+    O70X_FUNCTION_CTSTR,
+    O70X_STR_CTSTR,
+    O70X_CTSTR_CTSTR,
+    O70X_ACTSTR_CTSTR,
+    O70X_EXCEPTION_CTSTR,
+    O70X_MODULE_CTSTR,
+
+    O70X__COUNT /* Dracula ^..^ */
+};
+
+/* forward type definitions {{{1 */
 /* o70_status_t *************************************************************/
 /**
  *  Fast integer type to hold a status code.
@@ -214,6 +317,7 @@ typedef o70_status_t (C42_CALL * o70_obj_init_f)
     );
 #endif
 
+/* function pointer types {{{1 */
 /* o70_obj_finish_f *********************************************************/
 /**
  *  Finishes an object.
@@ -260,6 +364,7 @@ typedef o70_status_t (C42_CALL * o70_obj_set_prop_f)
         void * context
     );
 
+/* structs and unions {{{1 */
 struct o70_esf_s
 {
     uint32_t mod_idx; /**< index in world's module table */
@@ -341,6 +446,8 @@ struct o70_class_s
     void * prop_context;
     /**< context for o70_class_t#get_prop and o70_class_t#set_prop */
 
+    uint32_t model; /**< bitmask for primitive types compatible with instances
+                         of this class */
     size_t isize; /**< size in bytes of instances */
     // size_t class_size; /**< size in bytes of the class object */
 };
@@ -519,94 +626,8 @@ struct o70_world_s
     o70_pkstat_t aux_status; /**< aux status when the function returns the
                                "main" status */
 };
-/* o70_opcodes **************************************************************/
-/**
- *  Opcodes for the scripting VM.
- *
- * _lsx: local slot index
- * _idcx: identifier const index
- * _cbx: code block index
- *
- * resolve out_lsx, name_idcx
- * fget val_lsx, obj_lsx, name_idcx
- * fset val_lsx, obj_lsx, name_idcx
- * aget val_lsx, arr_lsx, index_lsx
- * aset val_lsx, arr_lsx, index_lsx
- * call val_lsx, func_lsx, arg0_lsx, ...
- * goto tgt_cbx
- * branch cond_lsx, true_lsx, false_lsx
- * ret val_lsx
- * throw exc_lsx
- */
-enum o70_opcodes
-{
-    O70O_COPY, // copy local var dest_lsx, src_lsx
-    O70O_PGET, // get from parent var context: depth, psx, lsx
-    O70O_PSET, // set var into parent var context: depth, psx, lsx
-    O70O_FGET, // field get
-    O70O_FSET,
-    O70O_AGET,
-    O70O_ASET,
-    O70O_CALL,
-    O70O_GOTO,
-    O70O_BRANCH,
-    O70O_RET,
-    O70O_THROW,
-};
 
-/* o70_statuses *************************************************************/
-/**
- *  Status codes returned by functions in this library
- */
-enum o70_statuses
-{
-    O70S_OK = 0, /**< all ok */
-    O70S_PENDING, /**< operation is pending; more scripting code needs to be
-                    executed before completing the operation */
-    O70S_BAD_ARG, /**< some argument or input field has an incorrect value */
-    O70S_NO_MEM, /**< allocation failed */
-    O70S_IO_ERROR, /**< I/O error */
-
-    O70S_BUG = 0x70,
-    O70S_TODO,
-};
-
-enum o70_builtin_object_indexes
-{
-    O70X_NULL,
-    O70X_FALSE,
-    O70X_TRUE,
-    O70X_OBJECT_CLASS,
-    O70X_CLASS_CLASS,
-    O70X_NULL_CLASS,
-    O70X_BOOL_CLASS,
-    O70X_INT_CLASS,
-    O70X_ARRAY_CLASS,
-    O70X_FUNCTION_CLASS,
-    O70X_STR_CLASS,
-    O70X_CTSTR_CLASS,
-    O70X_ACTSTR_CLASS,
-    O70X_EXCEPTION_CLASS,
-    O70X_MODULE_CLASS,
-    O70X_NULL_CTSTR,
-    O70X_FALSE_CTSTR,
-    O70X_TRUE_CTSTR,
-    O70X_NULL_CLASS_CTSTR,
-    O70X_BOOL_CTSTR,
-    O70X_INT_CTSTR,
-    O70X_OBJECT_CTSTR,
-    O70X_CLASS_CTSTR,
-    O70X_ARRAY_CTSTR,
-    O70X_FUNCTION_CTSTR,
-    O70X_STR_CTSTR,
-    O70X_CTSTR_CTSTR,
-    O70X_ACTSTR_CTSTR,
-    O70X_EXCEPTION_CTSTR,
-    O70X_MODULE_CTSTR,
-
-    O70X__COUNT /* Dracula ^..^ */
-};
-
+/* exported functions and API-style macros {{{1 */
 /* o70_lib_name *************************************************************/
 /**
  *  Returns a static str identifying the library with its configuration.
@@ -648,88 +669,6 @@ O70_API o70_status_t C42_CALL o70_world_finish
 (
     o70_world_t * w
 );
-
-/* o70_flow_create **********************************************************/
-/**
- *  Creates an execution flow.
- *  @param w [in]                   world
- *  @param flow_ptr [out]           receives the pointer to the allocated flow
- *  @param max_stack_depth [in]     max number of stack frames
- *  @retval O70S_OK                 all ok
- *  @retval O70S_BAD_ARG            invalid @a max_stack_depth
- *  @retval O70S_NO_MEM             allocation failed
- *  @retval O70S_BUG                allocator returned heap corruption
- */
-O70_API o70_status_t C42_CALL o70_flow_create
-(
-    o70_world_t * w,
-    o70_flow_t * * flow_ptr,
-    uint32_t max_stack_depth
-);
-
-/* o70_flow_destroy *********************************************************/
-/**
- *  Destroys an execution flow.
- *  @param flow [in]                flow to destroy
- *  @retval O70S_OK                 all ok
- *  @retval O70S_BUG                allocator returned heap corruption
- */
-O70_API o70_status_t C42_CALL o70_flow_destroy
-(
-    o70_flow_t * flow
-);
-
-/* o70_ctstr_intern *********************************************************/
-/**
- *  Returns the 'internalised' constant string.
- *  Internalised strings have the property that if 2 strings have the same
- *  content then their internalised strings are the same object.
- */
-O70_API o70_status_t C42_CALL o70_ctstr_intern
-(
-    o70_world_t * w,
-    o70_ref_t * out,
-    o70_ref_t in
-);
-
-/* o70_ctstr_static *********************************************************/
-/**
- *  Allocates a new static constant string object.
- */
-O70_API o70_status_t C42_CALL o70_ctstr_static
-(
-    o70_world_t * w,
-    o70_ref_t * out,
-    void const * ptr,
-    size_t len
-);
-
-/* O70_SCS ******************************************************************/
-/**
- *  Creates a static constant string from a given string literal.
- */
-#define O70_SCS(_w, _ref_ptr, _str_lit) \
-    (o70_ctstr_static((_w), (_ref_ptr), (_str_lit), sizeof(_str_lit) - 1))
-
-/* o70_ctstr_static_intern **************************************************/
-/**
- *  Given a static byte buffer it returns an internalized ctstr object.
- */
-O70_API o70_status_t C42_CALL o70_ctstr_static_intern
-(
-    o70_world_t * w,
-    o70_ref_t * out,
-    void const * ptr,
-    size_t len
-);
-
-/* O70_ISCS *****************************************************************/
-/**
- *  internalised static const string.
- */
-#define O70_ISCS(_w, _ref_ptr, _str_lit) \
-    (o70_ctstr_static_intern((_w), (_ref_ptr), \
-                             (_str_lit), sizeof(_str_lit) - 1))
 
 /* o70_ref_inc **************************************************************/
 /**
@@ -783,6 +722,88 @@ C42_INLINE o70_status_t o70_ref_dec
     return 0;
 }
 
+/* o70_flow_create **********************************************************/
+/**
+ *  Creates an execution flow.
+ *  @param w [in]                   world
+ *  @param flow_ptr [out]           receives the pointer to the allocated flow
+ *  @param max_stack_depth [in]     max number of stack frames
+ *  @retval O70S_OK                 all ok
+ *  @retval O70S_BAD_ARG            invalid @a max_stack_depth
+ *  @retval O70S_NO_MEM             allocation failed
+ *  @retval O70S_BUG                allocator returned heap corruption
+ */
+O70_API o70_status_t C42_CALL o70_flow_create
+(
+    o70_world_t * w,
+    o70_flow_t * * flow_ptr,
+    uint32_t max_stack_depth
+);
+
+/* o70_flow_destroy *********************************************************/
+/**
+ *  Destroys an execution flow.
+ *  @param flow [in]                flow to destroy
+ *  @retval O70S_OK                 all ok
+ *  @retval O70S_BUG                allocator returned heap corruption
+ */
+O70_API o70_status_t C42_CALL o70_flow_destroy
+(
+    o70_flow_t * flow
+);
+
+/* o70_ctstr_intern *********************************************************/
+/**
+ *  Returns the 'internalised' constant string.
+ *  Internalised strings have the property that if 2 strings have the same
+ *  content then their internalised strings are the same object.
+ */
+O70_API o70_status_t C42_CALL o70_ctstr_intern
+(
+    o70_world_t * w,
+    o70_ref_t in,
+    o70_ref_t * out
+);
+
+/* o70_ctstr_static *********************************************************/
+/**
+ *  Allocates a new static constant string object.
+ */
+O70_API o70_status_t C42_CALL o70_ctstr_static
+(
+    o70_world_t * w,
+    o70_ref_t * out,
+    void const * ptr,
+    size_t len
+);
+
+/* O70_CTSTR ****************************************************************/
+/**
+ *  Creates a static constant string from a given string literal.
+ */
+#define O70_CTSTR(_w, _ref_ptr, _str_lit) \
+    (o70_ctstr_static((_w), (_ref_ptr), (_str_lit), sizeof(_str_lit) - 1))
+
+/* o70_ctstr_static_intern **************************************************/
+/**
+ *  Given a static byte buffer it returns an internalized ctstr object.
+ */
+O70_API o70_status_t C42_CALL o70_ctstr_static_intern
+(
+    o70_world_t * w,
+    o70_ref_t * out,
+    void const * ptr,
+    size_t len
+);
+
+/* O70_ICTSTR ***************************************************************/
+/**
+ *  internalised static const string.
+ */
+#define O70_ICTSTR(_w, _ref_ptr, _str_lit) \
+    (o70_ctstr_static_intern((_w), (_ref_ptr), \
+                             (_str_lit), sizeof(_str_lit) - 1))
+
 /* o70_dump_icst ************************************************************/
 /**
  *  Dumps in escaped form all items from the internalised constant strings tree
@@ -792,6 +813,56 @@ O70_API o70_status_t C42_CALL o70_dump_icst
     o70_world_t * w,
     c42_io8_t * o
 );
+
+/* o70_obj_create ***********************************************************/
+/**
+ *  Creates a new <<object>> instance with an empty set of dynamic fields.
+ */
+O70_API o70_status_t C42_CALL o70_obj_create
+(
+    o70_world_t * w,
+    o70_ref_t * out
+);
+
+/* o70_obj_raw_get **********************************************************/
+/**
+ *  Retrieves a raw property of an object instance.
+ *  The property must be in the object's property bag as this function does
+ *  not run the property getter for the object.
+ *  @param w [in] world
+ *  @param obj [in] any instance derived from object
+ *  @param name [in] an internalised const string representing property name
+ *  @param value [out] will get value of property on success
+ */
+O70_API o70_status_t C42_CALL o70_obj_raw_get
+(
+    o70_world_t * w,
+    o70_ref_t obj,
+    o70_ref_t name,
+    o70_ref_t * value
+);
+
+/* o70_obj_raw_put **********************************************************/
+/**
+ *  Puts a raw property in an object instance.
+ *  The property will be modified/added to the property bag of the object.
+ *  @param w [in] world
+ *  @param obj [in] any instance derived from object
+ *  @param name [in] an internalised const string representing property name
+ *  @param value [in] value to be set; 
+ *  @note the ref count of @a value will be incremented
+ *  @note if the property did not exist in the object then the ref count of
+ *      @a name will be incremented
+ */
+O70_API o70_status_t C42_CALL o70_obj_raw_put
+(
+    o70_world_t * w,
+    o70_ref_t obj,
+    o70_ref_t name,
+    o70_ref_t value
+);
+
+/* }}}1 */
 
 #endif
 

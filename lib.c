@@ -1,7 +1,39 @@
 #include "intern.h"
 
+#if _DEBUG
 #define L(...) (c42_io8_fmt(w->err, __VA_ARGS__))
+#else
+#define L(...)
+#endif
+
 //#define L(...)
+
+/* ics_key_cmp **************************************************************/
+/**
+ *  Internalised const string key compare function.
+ *  This is a callback function used when finding an internalised const string.
+ *  @param key [in] a pointer to an c42_u8an_t instance
+ *  @param node [in] an o70_prop_node_t instance
+ *  @param context [in] an o70_world_t instance
+ */
+static uint_fast8_t C42_CALL ics_key_cmp
+(
+    uintptr_t key,
+    c42_rbtree_node_t * node,
+    void * restrict context
+);
+
+/* ics_node_create **********************************************************/
+/**
+ *  Creates a node in the internalised const string tree.
+ *  @note this increases the number of references to @a ctstr
+ */
+static o70_status_t C42_CALL ics_node_create
+(
+    o70_world_t * w,
+    c42_rbtree_path_t * path,
+    o70_ref_t ctstr
+);
 
 /* ox_alloc *****************************************************************/
 /**
@@ -22,6 +54,31 @@ static o70_status_t C42_CALL obj_alloc
     o70_world_t * restrict w,
     o70_oidx_t * restrict out,
     o70_oidx_t clox
+);
+
+/* prop_bag_init ************************************************************/
+/**
+ *  Inits a property bag.
+ *  Property bags are used for object fields, methods and maybe others.
+ */
+static void C42_CALL prop_bag_init
+(
+    o70_prop_bag_t * bag
+);
+
+/* prop_key_cmp *************************************************************/
+/**
+ *  Compares property keys.
+ *  @param key an object ref pointing to the internalised const string for
+ *          property being looked for
+ *  @param node pointer to struct o70_prop_node_t
+ *  @param context unused
+ */
+static uint_fast8_t C42_CALL prop_key_cmp
+(
+    uintptr_t key,
+    c42_rbtree_node_t * node,
+    void * restrict context
 );
 
 /* o70_lib_name *************************************************************/
@@ -111,8 +168,7 @@ static uint_fast8_t C42_CALL ics_key_cmp
 }
 
 /* ics_node_create **********************************************************/
-//static
-    o70_status_t C42_CALL ics_node_create
+static o70_status_t C42_CALL ics_node_create
 (
     o70_world_t * w,
     c42_rbtree_path_t * path,
@@ -181,97 +237,106 @@ O70_API o70_status_t C42_CALL o70_world_init
 
         c42_rbtree_init(&w->ics.rbt, ics_key_cmp, w);
 
-        w->ohdr[O70X_NULL            ] = &w->        null_obj.ohdr;
-        w->ohdr[O70X_FALSE           ] = &w->       false_obj.ohdr;
-        w->ohdr[O70X_TRUE            ] = &w->        true_obj.ohdr;
-        w->ohdr[O70X_NULL_CLASS      ] = &w->      null_class.ohdr;
-        w->ohdr[O70X_BOOL_CLASS      ] = &w->      bool_class.ohdr;
-        w->ohdr[O70X_OBJECT_CLASS    ] = &w->    object_class.ohdr;
-        w->ohdr[O70X_CLASS_CLASS     ] = &w->     class_class.ohdr;
-        w->ohdr[O70X_ARRAY_CLASS     ] = &w->     array_class.ohdr;
-        w->ohdr[O70X_FUNCTION_CLASS  ] = &w->  function_class.ohdr;
-        w->ohdr[O70X_STR_CLASS       ] = &w->       str_class.ohdr;
-        w->ohdr[O70X_CTSTR_CLASS     ] = &w->     ctstr_class.ohdr;
-        w->ohdr[O70X_ACTSTR_CLASS    ] = &w->    actstr_class.ohdr;
-        w->ohdr[O70X_EXCEPTION_CLASS ] = &w-> exception_class.ohdr;
-        w->ohdr[O70X_MODULE_CLASS    ] = &w->    module_class.ohdr;
-        w->ohdr[O70X_NULL_CTSTR      ] = &w->      null_ctstr.ohdr;
-        w->ohdr[O70X_FALSE_CTSTR     ] = &w->     false_ctstr.ohdr;
-        w->ohdr[O70X_TRUE_CTSTR      ] = &w->      true_ctstr.ohdr;
+        w->ohdr[O70X_ARRAY_CLASS] = &w->array_class.ohdr;
+        w->ohdr[O70X_FUNCTION_CLASS] = &w->function_class.ohdr;
+        w->ohdr[O70X_STR_CLASS] = &w->str_class.ohdr;
+        w->ohdr[O70X_CTSTR_CLASS] = &w->ctstr_class.ohdr;
+        w->ohdr[O70X_ACTSTR_CLASS] = &w->actstr_class.ohdr;
+        w->ohdr[O70X_EXCEPTION_CLASS] = &w->exception_class.ohdr;
+        w->ohdr[O70X_MODULE_CLASS] = &w->module_class.ohdr;
+        w->ohdr[O70X_NULL_CTSTR] = &w->null_ctstr.ohdr;
+        w->ohdr[O70X_FALSE_CTSTR] = &w->false_ctstr.ohdr;
+        w->ohdr[O70X_TRUE_CTSTR] = &w->true_ctstr.ohdr;
         w->ohdr[O70X_NULL_CLASS_CTSTR] = &w->null_class_ctstr.ohdr;
-        w->ohdr[O70X_BOOL_CTSTR      ] = &w->      bool_ctstr.ohdr;
-        w->ohdr[O70X_INT_CTSTR       ] = &w->       int_ctstr.ohdr;
-        w->ohdr[O70X_OBJECT_CTSTR    ] = &w->    object_ctstr.ohdr;
-        w->ohdr[O70X_CLASS_CTSTR     ] = &w->     class_ctstr.ohdr;
-        w->ohdr[O70X_ARRAY_CTSTR     ] = &w->     array_ctstr.ohdr;
-        w->ohdr[O70X_FUNCTION_CTSTR  ] = &w->  function_ctstr.ohdr;
-        w->ohdr[O70X_STR_CTSTR       ] = &w->       str_ctstr.ohdr;
-        w->ohdr[O70X_CTSTR_CTSTR     ] = &w->     ctstr_ctstr.ohdr;
-        w->ohdr[O70X_ACTSTR_CTSTR    ] = &w->    actstr_ctstr.ohdr;
-        w->ohdr[O70X_EXCEPTION_CTSTR ] = &w-> exception_ctstr.ohdr;
-        w->ohdr[O70X_MODULE_CTSTR    ] = &w->    module_ctstr.ohdr;
+        w->ohdr[O70X_BOOL_CTSTR] = &w->bool_ctstr.ohdr;
+        w->ohdr[O70X_INT_CTSTR] = &w->int_ctstr.ohdr;
+        w->ohdr[O70X_OBJECT_CTSTR] = &w->object_ctstr.ohdr;
+        w->ohdr[O70X_CLASS_CTSTR] = &w->class_ctstr.ohdr;
+        w->ohdr[O70X_ARRAY_CTSTR] = &w->array_ctstr.ohdr;
+        w->ohdr[O70X_FUNCTION_CTSTR] = &w->function_ctstr.ohdr;
+        w->ohdr[O70X_STR_CTSTR] = &w->str_ctstr.ohdr;
+        w->ohdr[O70X_CTSTR_CTSTR] = &w->ctstr_ctstr.ohdr;
+        w->ohdr[O70X_ACTSTR_CTSTR] = &w->actstr_ctstr.ohdr;
+        w->ohdr[O70X_EXCEPTION_CTSTR] = &w->exception_ctstr.ohdr;
+        w->ohdr[O70X_MODULE_CTSTR] = &w->module_ctstr.ohdr;
 
-        w->        null_obj.ohdr.nref = 1;
-        w->       false_obj.ohdr.nref = 1;
-        w->        true_obj.ohdr.nref = 1;
-        w->      null_class.ohdr.nref = 1;
-        w->      bool_class.ohdr.nref = 1;
-        w->       int_class.ohdr.nref = 1;
-        w->    object_class.ohdr.nref = 1;
-        w->     class_class.ohdr.nref = 1;
-        w->     array_class.ohdr.nref = 1;
-        w->  function_class.ohdr.nref = 1;
-        w->       str_class.ohdr.nref = 1;
-        w->    actstr_class.ohdr.nref = 1;
-        w->     ctstr_class.ohdr.nref = 1;
-        w-> exception_class.ohdr.nref = 1;
-        w->    module_class.ohdr.nref = 1;
-        w->      null_ctstr.ohdr.nref = 1;
-        w->     false_ctstr.ohdr.nref = 1;
-        w->      true_ctstr.ohdr.nref = 1;
+        w->ohdr[O70X_NULL] = &w->null_obj.ohdr;
+        w->null_obj.ohdr.nref = 1;
+        w->null_obj.ohdr.class_ox = O70X_NULL_CLASS;
+
+        w->ohdr[O70X_FALSE] = &w->false_obj.ohdr;
+        w->false_obj.ohdr.nref = 1;
+        w->false_obj.ohdr.class_ox = O70X_BOOL_CLASS;
+
+        w->ohdr[O70X_TRUE] = &w->true_obj.ohdr;
+        w->true_obj.ohdr.nref = 1;
+        w->true_obj.ohdr.class_ox = O70X_BOOL_CLASS;
+
+        w->ohdr[O70X_NULL_CLASS] = &w->null_class.ohdr;
+        w->null_class.ohdr.nref = 1;
+        w->null_class.ohdr.class_ox = O70X_CLASS_CLASS;
+
+        w->ohdr[O70X_BOOL_CLASS] = &w->bool_class.ohdr;
+        w->bool_class.ohdr.nref = 1;
+
+        w->ohdr[O70X_INT_CLASS] = &w->object_class.ohdr;
+        w->int_class.ohdr.nref = 1;
+
+        w->ohdr[O70X_OBJECT_CLASS] = &w->object_class.ohdr;
+        w->object_class.ohdr.nref = 1;
+
+        w->ohdr[O70X_CLASS_CLASS] = &w->class_class.ohdr;
+        w->class_class.ohdr.nref = 1;
+
+        w->array_class.ohdr.nref = 1;
+        w->function_class.ohdr.nref = 1;
+        w->str_class.ohdr.nref = 1;
+        w->actstr_class.ohdr.nref = 1;
+        w->ctstr_class.ohdr.nref = 1;
+        w->exception_class.ohdr.nref = 1;
+        w->module_class.ohdr.nref = 1;
+        w->null_ctstr.ohdr.nref = 1;
+        w->false_ctstr.ohdr.nref = 1;
+        w->true_ctstr.ohdr.nref = 1;
         w->null_class_ctstr.ohdr.nref = 1;
-        w->      bool_ctstr.ohdr.nref = 1;
-        w->       int_ctstr.ohdr.nref = 1;
-        w->    object_ctstr.ohdr.nref = 1;
-        w->     class_ctstr.ohdr.nref = 1;
-        w->     array_ctstr.ohdr.nref = 1;
-        w->  function_ctstr.ohdr.nref = 1;
-        w->       str_ctstr.ohdr.nref = 1;
-        w->     ctstr_ctstr.ohdr.nref = 1;
-        w->    actstr_ctstr.ohdr.nref = 1;
-        w-> exception_ctstr.ohdr.nref = 1;
-        w->    module_ctstr.ohdr.nref = 1;
+        w->bool_ctstr.ohdr.nref = 1;
+        w->int_ctstr.ohdr.nref = 1;
+        w->object_ctstr.ohdr.nref = 1;
+        w->class_ctstr.ohdr.nref = 1;
+        w->array_ctstr.ohdr.nref = 1;
+        w->function_ctstr.ohdr.nref = 1;
+        w->str_ctstr.ohdr.nref = 1;
+        w->ctstr_ctstr.ohdr.nref = 1;
+        w->actstr_ctstr.ohdr.nref = 1;
+        w->exception_ctstr.ohdr.nref = 1;
+        w->module_ctstr.ohdr.nref = 1;
 
-        w->        null_obj.ohdr.class_ox = O70X_NULL_CLASS;
-        w->       false_obj.ohdr.class_ox = O70X_BOOL_CLASS;
-        w->        true_obj.ohdr.class_ox = O70X_BOOL_CLASS;
-        w->      null_class.ohdr.class_ox = O70X_CLASS_CLASS;
-        w->      bool_class.ohdr.class_ox = O70X_CLASS_CLASS;
-        w->       int_class.ohdr.class_ox = O70X_CLASS_CLASS;
-        w->    object_class.ohdr.class_ox = O70X_CLASS_CLASS;
-        w->     class_class.ohdr.class_ox = O70X_CLASS_CLASS;
-        w->     array_class.ohdr.class_ox = O70X_CLASS_CLASS;
-        w->  function_class.ohdr.class_ox = O70X_CLASS_CLASS;
-        w->       str_class.ohdr.class_ox = O70X_CLASS_CLASS;
-        w->     ctstr_class.ohdr.class_ox = O70X_CLASS_CLASS;
-        w->    actstr_class.ohdr.class_ox = O70X_CLASS_CLASS;
-        w-> exception_class.ohdr.class_ox = O70X_CLASS_CLASS;
-        w->    module_class.ohdr.class_ox = O70X_CLASS_CLASS;
-        w->      null_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->     false_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->      true_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
+        w->bool_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->int_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->object_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->class_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->array_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->function_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->str_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->ctstr_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->actstr_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->exception_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->module_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->null_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
+        w->false_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
+        w->true_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
         w->null_class_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->      bool_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->       int_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->    object_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->     class_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->     array_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->  function_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->       str_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->     ctstr_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->    actstr_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w-> exception_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->    module_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
+        w->bool_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
+        w->int_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
+        w->object_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
+        w->class_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
+        w->array_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
+        w->function_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
+        w->str_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
+        w->ctstr_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
+        w->actstr_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
+        w->exception_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
+        w->module_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
 
 #define A(_x, _id, _str) \
         w->_id.data.a = (uint8_t *) (_str); w->_id.data.n = sizeof(_str) - 1; \
@@ -481,8 +546,11 @@ O70_API o70_status_t C42_CALL o70_dump_icst
         pn = (o70_prop_node_t *) n;
         cs = w->ot[O70_RTOX(pn->kv.key)];
         e = c42_io8_fmt(o, "$.*es\n", cs->data.n, cs->data.a);
-        if (e) L("o70_dump_icst: print failed: $b\n", e);
-        if (e) return O70S_IO_ERROR;
+        if (e) 
+        {
+            L("o70_dump_icst: print failed: $b\n", e);
+            return O70S_IO_ERROR;
+        }
     }
     return 0;
 }
@@ -554,6 +622,94 @@ O70_API o70_status_t C42_CALL o70_ctstr_static_intern
         if (os2 == O70S_BUG) return os2;
         return os;
     }
+    return 0;
+}
+
+/* o70_ctstr_intern *********************************************************/
+O70_API o70_status_t C42_CALL o70_ctstr_intern
+(
+    o70_world_t * w,
+    o70_ref_t in,
+    o70_ref_t * out
+)
+{
+    c42_rbtree_path_t path;
+    o70_prop_node_t * pn;
+    uint_fast8_t rbte;
+    o70_status_t os;
+    o70_ref_t r;
+    o70_ctstr_t * ics;
+
+    ics = w->ot[O70_RTOX(in)];
+
+    /* now do the lookup */
+    rbte = c42_rbtree_find(&path, &w->ics.rbt, (uintptr_t) &ics->data);
+    if (rbte == C42_RBTREE_FOUND)
+    {
+        /* found the node; the key of the node is the reference to our ctstr */
+        pn = (o70_prop_node_t *) path.nodes[path.last];
+        *out = r = pn->kv.key;
+        o70_ref_inc(w, r);
+        return 0;
+    }
+    *out = in;
+    /* create the node in the internalised ctstr tree */
+    os = ics_node_create(w, &path, in);
+    if (os)
+    {
+        /* failed to create the node */
+        if (os == O70S_BUG) return os;
+        return os;
+    }
+    return 0;
+}
+
+/* prop_key_cmp *************************************************************/
+static uint_fast8_t C42_CALL prop_key_cmp
+(
+    uintptr_t key,
+    c42_rbtree_node_t * node,
+    void * restrict context
+)
+{
+    o70_prop_node_t const * pn = (o70_prop_node_t const *) node;
+    (void) context;
+    if ((uint32_t) key == pn->kv.key) return C42_RBTREE_EQUAL;
+    return ((uint32_t) key > pn->kv.key) ? C42_RBTREE_MORE : C42_RBTREE_LESS;
+}
+
+/* prop_bag_init ************************************************************/
+static void C42_CALL prop_bag_init
+(
+    o70_prop_bag_t * bag
+)
+{
+    c42_rbtree_init(&bag->rbt, prop_key_cmp, NULL);
+}
+
+/* o70_obj_create ***********************************************************/
+/**
+ *  Creates a new <<object>> instance with an empty set of dynamic fields.
+ */
+O70_API o70_status_t C42_CALL o70_obj_create
+(
+    o70_world_t * w,
+    o70_ref_t * out
+)
+{
+    o70_status_t os;
+    o70_oidx_t ox;
+    o70_object_t * obj;
+    os = obj_alloc(w, &ox, O70X_OBJECT_CTSTR);
+    if (os)
+    {
+        L("o70_obj_create: obj_alloc failed: $s = $xd\n", 
+          o70_status_name(os), os);
+        return os;
+    }
+    obj = w->ot[ox];
+    prop_bag_init(&obj->fields);
+    *out = O70_XTOR(ox);
     return 0;
 }
 
