@@ -92,6 +92,7 @@ enum o70_statuses
     O70S_OK = 0, /**< all ok */
     O70S_PENDING, /**< operation is pending; more scripting code needs to be
                     executed before completing the operation */
+    O70S_MISSING, /**< item/property missing */
     O70S_BAD_ARG, /**< some argument or input field has an incorrect value */
     O70S_NO_MEM, /**< allocation failed */
     O70S_IO_ERROR, /**< I/O error */
@@ -105,7 +106,7 @@ enum o70_builtin_object_indexes
     O70X_NULL,
     O70X_FALSE,
     O70X_TRUE,
-    O70X_OBJECT_CLASS,
+    O70X_DYNOBJ_CLASS,
     O70X_CLASS_CLASS,
     O70X_NULL_CLASS,
     O70X_BOOL_CLASS,
@@ -123,7 +124,7 @@ enum o70_builtin_object_indexes
     O70X_NULL_CLASS_CTSTR,
     O70X_BOOL_CTSTR,
     O70X_INT_CTSTR,
-    O70X_OBJECT_CTSTR,
+    O70X_DYNOBJ_CTSTR,
     O70X_CLASS_CTSTR,
     O70X_ARRAY_CTSTR,
     O70X_FUNCTION_CTSTR,
@@ -208,12 +209,12 @@ typedef struct o70_prop_bag_s o70_prop_bag_t;
  */
 typedef struct o70_kv_s o70_kv_t;
 
-/* o70_object_t *************************************************************/
+/* o70_dynobj_t *************************************************************/
 /**
  *  Standard object structure.
  *  This is for objects that act as dynamic property bags.
  */
-typedef struct o70_object_s o70_object_t;
+typedef struct o70_dynobj_s o70_dynobj_t;
 
 /* o70_class_t **************************************************************/
 /**
@@ -287,11 +288,11 @@ typedef struct o70_esf_s o70_esf_t;
  */
 typedef struct o70_ehi_s o70_ehi_t;
 
-/* o70_slim_obj_t ***********************************************************/
+/* o70_object_t ***********************************************************/
 /**
  *  Slim object (object without properties).
  */
-typedef struct o70_slim_obj_s o70_slim_obj_t;
+typedef struct o70_object_s o70_object_t;
 
 /* o70_exception_t **********************************************************/
 /**
@@ -422,12 +423,12 @@ struct o70_prop_bag_s
     c42_rbtree_t rbt; /**< red/black tree */
 };
 
-struct o70_slim_obj_s
+struct o70_object_s
 {
     o70_ohdr_t ohdr; /**< object header */
 };
 
-struct o70_object_s
+struct o70_dynobj_s
 {
     o70_ohdr_t ohdr; /**< object header */
     o70_prop_bag_t fields; /**< property bag */
@@ -591,9 +592,9 @@ struct o70_world_s
     c42_io8_t * out; /**< standard output */
     c42_io8_t * err; /**< standard error */
 
-    o70_slim_obj_t null_obj; /**< null object */
-    o70_slim_obj_t false_obj; /**< false object */
-    o70_slim_obj_t true_obj; /**< true object */
+    o70_object_t null_obj; /**< null object */
+    o70_object_t false_obj; /**< false object */
+    o70_object_t true_obj; /**< true object */
     o70_class_t null_class; /**< null class */
     o70_class_t bool_class; /**< bool class */
     o70_class_t int_class; /**< int class */
@@ -814,17 +815,17 @@ O70_API o70_status_t C42_CALL o70_dump_icst
     c42_io8_t * o
 );
 
-/* o70_obj_create ***********************************************************/
+/* o70_dynobj_create ********************************************************/
 /**
  *  Creates a new <<object>> instance with an empty set of dynamic fields.
  */
-O70_API o70_status_t C42_CALL o70_obj_create
+O70_API o70_status_t C42_CALL o70_dynobj_create
 (
     o70_world_t * w,
     o70_ref_t * out
 );
 
-/* o70_obj_raw_get **********************************************************/
+/* o70_dynobj_raw_get *******************************************************/
 /**
  *  Retrieves a raw property of an object instance.
  *  The property must be in the object's property bag as this function does
@@ -833,8 +834,10 @@ O70_API o70_status_t C42_CALL o70_obj_create
  *  @param obj [in] any instance derived from object
  *  @param name [in] an internalised const string representing property name
  *  @param value [out] will get value of property on success
+ *  @retval 0 property found and value returned
+ *  @retval O70S_MISSING property not found
  */
-O70_API o70_status_t C42_CALL o70_obj_raw_get
+O70_API o70_status_t C42_CALL o70_dynobj_raw_get
 (
     o70_world_t * w,
     o70_ref_t obj,
@@ -842,7 +845,7 @@ O70_API o70_status_t C42_CALL o70_obj_raw_get
     o70_ref_t * value
 );
 
-/* o70_obj_raw_put **********************************************************/
+/* o70_dynobj_raw_put *******************************************************/
 /**
  *  Puts a raw property in an object instance.
  *  The property will be modified/added to the property bag of the object.
@@ -854,7 +857,7 @@ O70_API o70_status_t C42_CALL o70_obj_raw_get
  *  @note if the property did not exist in the object then the ref count of
  *      @a name will be incremented
  */
-O70_API o70_status_t C42_CALL o70_obj_raw_put
+O70_API o70_status_t C42_CALL o70_dynobj_raw_put
 (
     o70_world_t * w,
     o70_ref_t obj,

@@ -250,7 +250,7 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->ohdr[O70X_NULL_CLASS_CTSTR] = &w->null_class_ctstr.ohdr;
         w->ohdr[O70X_BOOL_CTSTR] = &w->bool_ctstr.ohdr;
         w->ohdr[O70X_INT_CTSTR] = &w->int_ctstr.ohdr;
-        w->ohdr[O70X_OBJECT_CTSTR] = &w->object_ctstr.ohdr;
+        w->ohdr[O70X_DYNOBJ_CTSTR] = &w->object_ctstr.ohdr;
         w->ohdr[O70X_CLASS_CTSTR] = &w->class_ctstr.ohdr;
         w->ohdr[O70X_ARRAY_CTSTR] = &w->array_ctstr.ohdr;
         w->ohdr[O70X_FUNCTION_CTSTR] = &w->function_ctstr.ohdr;
@@ -282,7 +282,7 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->ohdr[O70X_INT_CLASS] = &w->object_class.ohdr;
         w->int_class.ohdr.nref = 1;
 
-        w->ohdr[O70X_OBJECT_CLASS] = &w->object_class.ohdr;
+        w->ohdr[O70X_DYNOBJ_CLASS] = &w->object_class.ohdr;
         w->object_class.ohdr.nref = 1;
 
         w->ohdr[O70X_CLASS_CLASS] = &w->class_class.ohdr;
@@ -350,7 +350,7 @@ O70_API o70_status_t C42_CALL o70_world_init
         A(O70X_NULL_CLASS_CTSTR, null_class_ctstr, "null_class"   );
         A(O70X_BOOL_CTSTR      ,       bool_ctstr, "bool"         );
         A(O70X_INT_CTSTR       ,        int_ctstr, "int"          );
-        A(O70X_OBJECT_CTSTR    ,     object_ctstr, "object"       );
+        A(O70X_DYNOBJ_CTSTR    ,     object_ctstr, "object"       );
         A(O70X_CLASS_CTSTR     ,      class_ctstr, "class"        );
         A(O70X_ARRAY_CTSTR     ,      array_ctstr, "array"        );
         A(O70X_FUNCTION_CTSTR  ,   function_ctstr, "function"     );
@@ -361,10 +361,10 @@ O70_API o70_status_t C42_CALL o70_world_init
         A(O70X_MODULE_CTSTR    ,     module_ctstr, "module"       );
 #undef A
 
-        w->      null_class.isize = sizeof(o70_slim_obj_t   );
-        w->      bool_class.isize = sizeof(o70_slim_obj_t   );
-        w->       int_class.isize = sizeof(o70_slim_obj_t   );
-        w->    object_class.isize = sizeof(o70_slim_obj_t   );
+        w->      null_class.isize = sizeof(o70_object_t   );
+        w->      bool_class.isize = sizeof(o70_object_t   );
+        w->       int_class.isize = sizeof(o70_object_t   );
+        w->    object_class.isize = sizeof(o70_object_t   );
         w->     class_class.isize = sizeof(o70_class_t      );
         w->     array_class.isize = sizeof(o70_array_t      );
         w->  function_class.isize = sizeof(o70_function_t   );
@@ -687,11 +687,8 @@ static void C42_CALL prop_bag_init
     c42_rbtree_init(&bag->rbt, prop_key_cmp, NULL);
 }
 
-/* o70_obj_create ***********************************************************/
-/**
- *  Creates a new <<object>> instance with an empty set of dynamic fields.
- */
-O70_API o70_status_t C42_CALL o70_obj_create
+/* o70_dynobj_create ********************************************************/
+O70_API o70_status_t C42_CALL o70_dynobj_create
 (
     o70_world_t * w,
     o70_ref_t * out
@@ -699,8 +696,8 @@ O70_API o70_status_t C42_CALL o70_obj_create
 {
     o70_status_t os;
     o70_oidx_t ox;
-    o70_object_t * obj;
-    os = obj_alloc(w, &ox, O70X_OBJECT_CTSTR);
+    o70_dynobj_t * obj;
+    os = obj_alloc(w, &ox, O70X_DYNOBJ_CLASS);
     if (os)
     {
         L("o70_obj_create: obj_alloc failed: $s = $xd\n", 
@@ -712,4 +709,38 @@ O70_API o70_status_t C42_CALL o70_obj_create
     *out = O70_XTOR(ox);
     return 0;
 }
+
+/* o70_dynobj_raw_get *******************************************************/
+O70_API o70_status_t C42_CALL o70_dynobj_raw_get
+(
+    o70_world_t * w,
+    o70_ref_t obj,
+    o70_ref_t name,
+    o70_ref_t * value
+)
+{
+    (void) w;
+    (void) obj;
+    (void) name;
+    (void) value;
+    return O70S_TODO;
+}
+
+
+/* o70_dynobj_raw_put *******************************************************/
+O70_API o70_status_t C42_CALL o70_dynobj_raw_put
+(
+    o70_world_t * w,
+    o70_ref_t obj,
+    o70_ref_t name,
+    o70_ref_t value
+)
+{
+    (void) w;
+    (void) obj;
+    (void) name;
+    (void) value;
+    return O70S_TODO;
+}
+
 
