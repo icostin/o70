@@ -36,7 +36,7 @@
 #define O70_IS_OREF(_ref) (!((_ref) & 1))
 
 /* Object model constants */
-#define O70M_OBJECT     (1 << 0) /**< regular object (with a property bag) */
+#define O70M_DYNOBJ     (1 << 0) /**< regular object (with a property bag) */
 #define O70M_CLASS      (1 << 1) /**< class model */
 #define O70M_SCTSTR     (1 << 2) 
 #define O70M_ACTSTR     (1 << 3)
@@ -116,23 +116,27 @@ enum o70_builtin_object_indexes
     O70X_STR_CLASS,
     O70X_CTSTR_CLASS,
     O70X_ACTSTR_CLASS,
+    O70X_ICTSTR_CLASS,
+    O70X_IACTSTR_CLASS,
     O70X_EXCEPTION_CLASS,
     O70X_MODULE_CLASS,
-    O70X_NULL_CTSTR,
-    O70X_FALSE_CTSTR,
-    O70X_TRUE_CTSTR,
-    O70X_NULL_CLASS_CTSTR,
-    O70X_BOOL_CTSTR,
-    O70X_INT_CTSTR,
-    O70X_DYNOBJ_CTSTR,
-    O70X_CLASS_CTSTR,
-    O70X_ARRAY_CTSTR,
-    O70X_FUNCTION_CTSTR,
-    O70X_STR_CTSTR,
-    O70X_CTSTR_CTSTR,
-    O70X_ACTSTR_CTSTR,
-    O70X_EXCEPTION_CTSTR,
-    O70X_MODULE_CTSTR,
+    O70X_NULL_ICTSTR,
+    O70X_FALSE_ICTSTR,
+    O70X_TRUE_ICTSTR,
+    O70X_NULL_CLASS_ICTSTR,
+    O70X_BOOL_ICTSTR,
+    O70X_INT_ICTSTR,
+    O70X_DYNOBJ_ICTSTR,
+    O70X_CLASS_ICTSTR,
+    O70X_ARRAY_ICTSTR,
+    O70X_FUNCTION_ICTSTR,
+    O70X_STR_ICTSTR,
+    O70X_CTSTR_ICTSTR,
+    O70X_ACTSTR_ICTSTR,
+    O70X_ICTSTR_ICTSTR,
+    O70X_IACTSTR_ICTSTR,
+    O70X_EXCEPTION_ICTSTR,
+    O70X_MODULE_ICTSTR,
 
     O70X__COUNT /* Dracula ^..^ */
 };
@@ -598,30 +602,34 @@ struct o70_world_s
     o70_class_t null_class; /**< null class */
     o70_class_t bool_class; /**< bool class */
     o70_class_t int_class; /**< int class */
-    o70_class_t object_class; /**< object class */
+    o70_class_t dynobj_class; /**< dynobj class */
     o70_class_t class_class; /**< class class */
     o70_class_t array_class; /**< array class */
     o70_class_t function_class; /**< function class */
     o70_class_t str_class; /**< str class */
     o70_class_t ctstr_class; /**< const str class */
     o70_class_t actstr_class; /**< allocated const str class */
+    o70_class_t ictstr_class; /**< internalized const str class */
+    o70_class_t iactstr_class; /**< internalized allocated const str class */
     o70_class_t exception_class; /**< exception class */
     o70_class_t module_class; /**< module class */
-    o70_ctstr_t null_ctstr; /**< null ctstr */
-    o70_ctstr_t false_ctstr; /**< false ctstr */
-    o70_ctstr_t true_ctstr; /**< true ctstr */
-    o70_ctstr_t null_class_ctstr; /**< null ctstr */
-    o70_ctstr_t bool_ctstr; /**< bool ctstr */
-    o70_ctstr_t int_ctstr; /**< int ctstr */
-    o70_ctstr_t object_ctstr; /**< object ctstr */
-    o70_ctstr_t class_ctstr; /**< class ctstr */
-    o70_ctstr_t array_ctstr; /**< array ctstr */
-    o70_ctstr_t function_ctstr; /**< function ctstr */
-    o70_ctstr_t str_ctstr; /**< str ctstr */
-    o70_ctstr_t ctstr_ctstr; /**< ctstr ctstr */
-    o70_ctstr_t actstr_ctstr; /**< actstr ctstr */
-    o70_ctstr_t exception_ctstr; /**< exception ctstr */
-    o70_ctstr_t module_ctstr; /**< module ctstr */
+    o70_ctstr_t null_ictstr; /**< null ctstr */
+    o70_ctstr_t false_ictstr; /**< false ctstr */
+    o70_ctstr_t true_ictstr; /**< true ctstr */
+    o70_ctstr_t null_class_ictstr; /**< null ctstr */
+    o70_ctstr_t bool_ictstr; /**< bool ctstr */
+    o70_ctstr_t int_ictstr; /**< int ctstr */
+    o70_ctstr_t dynobj_ictstr; /**< object ctstr */
+    o70_ctstr_t class_ictstr; /**< class ctstr */
+    o70_ctstr_t array_ictstr; /**< array ctstr */
+    o70_ctstr_t function_ictstr; /**< function ctstr */
+    o70_ctstr_t str_ictstr; /**< str ctstr */
+    o70_ctstr_t ctstr_ictstr; /**< ctstr ctstr */
+    o70_ctstr_t actstr_ictstr; /**< actstr ctstr */
+    o70_ctstr_t ictstr_ictstr; /**< ictstr ctstr */
+    o70_ctstr_t iactstr_ictstr; /**< iactstr ctstr */
+    o70_ctstr_t exception_ictstr; /**< exception ctstr */
+    o70_ctstr_t module_ictstr; /**< module ctstr */
     o70_module_t mcore; /**< core module */
 
     o70_pkstat_t aux_status; /**< aux status when the function returns the
@@ -817,7 +825,7 @@ O70_API o70_status_t C42_CALL o70_dump_icst
 
 /* o70_dynobj_create ********************************************************/
 /**
- *  Creates a new <<object>> instance with an empty set of dynamic fields.
+ *  Creates a new <<dynobj>> instance with an empty set of dynamic fields.
  */
 O70_API o70_status_t C42_CALL o70_dynobj_create
 (

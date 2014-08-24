@@ -194,6 +194,12 @@ O70_API o70_status_t C42_CALL o70_world_init
     o70_init_t * ini
 )
 {
+#define A(_x, _id, _str) \
+        w->_id.data.a = (uint8_t *) (_str); w->_id.data.n = sizeof(_str) - 1; \
+        rbte = c42_rbtree_find(&path, &w->ics.rbt, (uintptr_t) &w->_id.data); \
+        if (rbte != C42_RBTREE_NOT_FOUND) { r = O70S_BUG; break; } \
+        if ((r = ics_node_create(w, &path, O70_XTOR((_x))))) break;
+
     c42_rbtree_path_t path;
     uint_fast8_t rbte;
     uint_fast8_t mae;
@@ -237,29 +243,6 @@ O70_API o70_status_t C42_CALL o70_world_init
 
         c42_rbtree_init(&w->ics.rbt, ics_key_cmp, w);
 
-        w->ohdr[O70X_ARRAY_CLASS] = &w->array_class.ohdr;
-        w->ohdr[O70X_FUNCTION_CLASS] = &w->function_class.ohdr;
-        w->ohdr[O70X_STR_CLASS] = &w->str_class.ohdr;
-        w->ohdr[O70X_CTSTR_CLASS] = &w->ctstr_class.ohdr;
-        w->ohdr[O70X_ACTSTR_CLASS] = &w->actstr_class.ohdr;
-        w->ohdr[O70X_EXCEPTION_CLASS] = &w->exception_class.ohdr;
-        w->ohdr[O70X_MODULE_CLASS] = &w->module_class.ohdr;
-        w->ohdr[O70X_NULL_CTSTR] = &w->null_ctstr.ohdr;
-        w->ohdr[O70X_FALSE_CTSTR] = &w->false_ctstr.ohdr;
-        w->ohdr[O70X_TRUE_CTSTR] = &w->true_ctstr.ohdr;
-        w->ohdr[O70X_NULL_CLASS_CTSTR] = &w->null_class_ctstr.ohdr;
-        w->ohdr[O70X_BOOL_CTSTR] = &w->bool_ctstr.ohdr;
-        w->ohdr[O70X_INT_CTSTR] = &w->int_ctstr.ohdr;
-        w->ohdr[O70X_DYNOBJ_CTSTR] = &w->object_ctstr.ohdr;
-        w->ohdr[O70X_CLASS_CTSTR] = &w->class_ctstr.ohdr;
-        w->ohdr[O70X_ARRAY_CTSTR] = &w->array_ctstr.ohdr;
-        w->ohdr[O70X_FUNCTION_CTSTR] = &w->function_ctstr.ohdr;
-        w->ohdr[O70X_STR_CTSTR] = &w->str_ctstr.ohdr;
-        w->ohdr[O70X_CTSTR_CTSTR] = &w->ctstr_ctstr.ohdr;
-        w->ohdr[O70X_ACTSTR_CTSTR] = &w->actstr_ctstr.ohdr;
-        w->ohdr[O70X_EXCEPTION_CTSTR] = &w->exception_ctstr.ohdr;
-        w->ohdr[O70X_MODULE_CTSTR] = &w->module_ctstr.ohdr;
-
         w->ohdr[O70X_NULL] = &w->null_obj.ohdr;
         w->null_obj.ohdr.nref = 1;
         w->null_obj.ohdr.class_ox = O70X_NULL_CLASS;
@@ -275,104 +258,157 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->ohdr[O70X_NULL_CLASS] = &w->null_class.ohdr;
         w->null_class.ohdr.nref = 1;
         w->null_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->null_class.isize = sizeof(o70_object_t);
 
         w->ohdr[O70X_BOOL_CLASS] = &w->bool_class.ohdr;
         w->bool_class.ohdr.nref = 1;
+        w->bool_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->bool_class.isize = sizeof(o70_object_t);
 
-        w->ohdr[O70X_INT_CLASS] = &w->object_class.ohdr;
+        w->ohdr[O70X_INT_CLASS] = &w->dynobj_class.ohdr;
         w->int_class.ohdr.nref = 1;
+        w->int_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->int_class.isize = sizeof(o70_object_t);
 
-        w->ohdr[O70X_DYNOBJ_CLASS] = &w->object_class.ohdr;
-        w->object_class.ohdr.nref = 1;
+        w->ohdr[O70X_DYNOBJ_CLASS] = &w->dynobj_class.ohdr;
+        w->dynobj_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->dynobj_class.ohdr.nref = 1;
+        w->dynobj_class.isize = sizeof(o70_object_t);
 
         w->ohdr[O70X_CLASS_CLASS] = &w->class_class.ohdr;
         w->class_class.ohdr.nref = 1;
-
-        w->array_class.ohdr.nref = 1;
-        w->function_class.ohdr.nref = 1;
-        w->str_class.ohdr.nref = 1;
-        w->actstr_class.ohdr.nref = 1;
-        w->ctstr_class.ohdr.nref = 1;
-        w->exception_class.ohdr.nref = 1;
-        w->module_class.ohdr.nref = 1;
-        w->null_ctstr.ohdr.nref = 1;
-        w->false_ctstr.ohdr.nref = 1;
-        w->true_ctstr.ohdr.nref = 1;
-        w->null_class_ctstr.ohdr.nref = 1;
-        w->bool_ctstr.ohdr.nref = 1;
-        w->int_ctstr.ohdr.nref = 1;
-        w->object_ctstr.ohdr.nref = 1;
-        w->class_ctstr.ohdr.nref = 1;
-        w->array_ctstr.ohdr.nref = 1;
-        w->function_ctstr.ohdr.nref = 1;
-        w->str_ctstr.ohdr.nref = 1;
-        w->ctstr_ctstr.ohdr.nref = 1;
-        w->actstr_ctstr.ohdr.nref = 1;
-        w->exception_ctstr.ohdr.nref = 1;
-        w->module_ctstr.ohdr.nref = 1;
-
-        w->bool_class.ohdr.class_ox = O70X_CLASS_CLASS;
-        w->int_class.ohdr.class_ox = O70X_CLASS_CLASS;
-        w->object_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->class_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->class_class.isize = sizeof(o70_class_t);
+
+        w->ohdr[O70X_ARRAY_CLASS] = &w->array_class.ohdr;
+        w->array_class.ohdr.nref = 1;
         w->array_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->array_class.isize = sizeof(o70_array_t);
+
+        w->ohdr[O70X_FUNCTION_CLASS] = &w->function_class.ohdr;
+        w->function_class.ohdr.nref = 1;
         w->function_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->function_class.isize = sizeof(o70_function_t);
+
+        w->ohdr[O70X_STR_CLASS] = &w->str_class.ohdr;
+        w->str_class.ohdr.nref = 1;
         w->str_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->str_class.isize = sizeof(o70_str_t);
+
+        w->ohdr[O70X_CTSTR_CLASS] = &w->ctstr_class.ohdr;
+        w->ctstr_class.ohdr.nref = 1;
         w->ctstr_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->ctstr_class.isize = sizeof(o70_ctstr_t);
+
+        w->ohdr[O70X_ACTSTR_CLASS] = &w->actstr_class.ohdr;
+        w->actstr_class.ohdr.nref = 1;
         w->actstr_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->actstr_class.isize = sizeof(o70_ctstr_t);
+
+        w->ohdr[O70X_ICTSTR_CLASS] = &w->ictstr_class.ohdr;
+        w->ictstr_class.ohdr.nref = 1;
+        w->ictstr_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->ictstr_class.isize = sizeof(o70_ctstr_t);
+
+        w->ohdr[O70X_IACTSTR_CLASS] = &w->iactstr_class.ohdr;
+        w->iactstr_class.ohdr.nref = 1;
+        w->iactstr_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->iactstr_class.isize = sizeof(o70_ctstr_t);
+
+        w->ohdr[O70X_EXCEPTION_CLASS] = &w->exception_class.ohdr;
+        w->exception_class.ohdr.nref = 1;
         w->exception_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->exception_class.isize = sizeof(o70_exception_t);
+
+        w->ohdr[O70X_MODULE_CLASS] = &w->module_class.ohdr;
+        w->module_class.ohdr.nref = 1;
         w->module_class.ohdr.class_ox = O70X_CLASS_CLASS;
-        w->null_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->false_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->true_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->null_class_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->bool_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->int_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->object_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->class_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->array_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->function_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->str_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->ctstr_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->actstr_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->exception_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
-        w->module_ctstr.ohdr.class_ox = O70X_CTSTR_CLASS;
+        w->module_class.isize = sizeof(o70_module_t);
 
-#define A(_x, _id, _str) \
-        w->_id.data.a = (uint8_t *) (_str); w->_id.data.n = sizeof(_str) - 1; \
-        rbte = c42_rbtree_find(&path, &w->ics.rbt, (uintptr_t) &w->_id.data); \
-        if (rbte != C42_RBTREE_NOT_FOUND) { r = O70S_BUG; break; } \
-        if ((r = ics_node_create(w, &path, O70_XTOR((_x))))) break;
+        w->ohdr[O70X_NULL_ICTSTR] = &w->null_ictstr.ohdr;
+        w->null_ictstr.ohdr.nref = 1;
+        w->null_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
+        A(O70X_NULL_ICTSTR, null_ictstr, "null");
 
-        A(O70X_NULL_CTSTR      ,       null_ctstr, "null"         );
-        A(O70X_FALSE_CTSTR     ,      false_ctstr, "false"        );
-        A(O70X_TRUE_CTSTR      ,       true_ctstr, "true"         );
-        A(O70X_NULL_CLASS_CTSTR, null_class_ctstr, "null_class"   );
-        A(O70X_BOOL_CTSTR      ,       bool_ctstr, "bool"         );
-        A(O70X_INT_CTSTR       ,        int_ctstr, "int"          );
-        A(O70X_DYNOBJ_CTSTR    ,     object_ctstr, "object"       );
-        A(O70X_CLASS_CTSTR     ,      class_ctstr, "class"        );
-        A(O70X_ARRAY_CTSTR     ,      array_ctstr, "array"        );
-        A(O70X_FUNCTION_CTSTR  ,   function_ctstr, "function"     );
-        A(O70X_STR_CTSTR       ,        str_ctstr, "str"          );
-        A(O70X_CTSTR_CTSTR     ,      ctstr_ctstr, "ctstr"        );
-        A(O70X_ACTSTR_CTSTR    ,     actstr_ctstr, "actstr"       );
-        A(O70X_EXCEPTION_CTSTR ,  exception_ctstr, "exception"    );
-        A(O70X_MODULE_CTSTR    ,     module_ctstr, "module"       );
-#undef A
+        w->ohdr[O70X_FALSE_ICTSTR] = &w->false_ictstr.ohdr;
+        w->false_ictstr.ohdr.nref = 1;
+        w->false_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
+        A(O70X_FALSE_ICTSTR, false_ictstr, "false");
 
-        w->      null_class.isize = sizeof(o70_object_t   );
-        w->      bool_class.isize = sizeof(o70_object_t   );
-        w->       int_class.isize = sizeof(o70_object_t   );
-        w->    object_class.isize = sizeof(o70_object_t   );
-        w->     class_class.isize = sizeof(o70_class_t      );
-        w->     array_class.isize = sizeof(o70_array_t      );
-        w->  function_class.isize = sizeof(o70_function_t   );
-        w->       str_class.isize = sizeof(o70_str_t        );
-        w->     ctstr_class.isize = sizeof(o70_ctstr_t      );
-        w->    actstr_class.isize = sizeof(o70_ctstr_t      );
-        w-> exception_class.isize = sizeof(o70_exception_t  );
-        w->    module_class.isize = sizeof(o70_module_t     );
+        w->ohdr[O70X_TRUE_ICTSTR] = &w->true_ictstr.ohdr;
+        w->true_ictstr.ohdr.nref = 1;
+        w->true_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
+        A(O70X_TRUE_ICTSTR, true_ictstr, "true");
+
+        w->ohdr[O70X_NULL_CLASS_ICTSTR] = &w->null_class_ictstr.ohdr;
+        w->null_class_ictstr.ohdr.nref = 1;
+        w->null_class_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
+        A(O70X_NULL_CLASS_ICTSTR, null_class_ictstr, "null_class");
+
+        w->ohdr[O70X_BOOL_ICTSTR] = &w->bool_ictstr.ohdr;
+        w->bool_ictstr.ohdr.nref = 1;
+        w->bool_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
+        A(O70X_BOOL_ICTSTR, bool_ictstr, "bool");
+
+        w->ohdr[O70X_INT_ICTSTR] = &w->int_ictstr.ohdr;
+        w->int_ictstr.ohdr.nref = 1;
+        w->int_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
+        A(O70X_INT_ICTSTR, int_ictstr, "int");
+
+        w->ohdr[O70X_DYNOBJ_ICTSTR] = &w->dynobj_ictstr.ohdr;
+        w->dynobj_ictstr.ohdr.nref = 1;
+        w->dynobj_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
+        A(O70X_DYNOBJ_ICTSTR, dynobj_ictstr, "dynobj");
+
+        w->ohdr[O70X_CLASS_ICTSTR] = &w->class_ictstr.ohdr;
+        w->class_ictstr.ohdr.nref = 1;
+        w->class_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
+        A(O70X_CLASS_ICTSTR, class_ictstr, "class");
+
+        w->ohdr[O70X_ARRAY_ICTSTR] = &w->array_ictstr.ohdr;
+        w->array_ictstr.ohdr.nref = 1;
+        w->array_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
+        A(O70X_ARRAY_ICTSTR, array_ictstr, "array");
+
+        w->ohdr[O70X_FUNCTION_ICTSTR] = &w->function_ictstr.ohdr;
+        w->function_ictstr.ohdr.nref = 1;
+        w->function_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
+        A(O70X_FUNCTION_ICTSTR, function_ictstr, "function");
+
+        w->ohdr[O70X_STR_ICTSTR] = &w->str_ictstr.ohdr;
+        w->str_ictstr.ohdr.nref = 1;
+        w->str_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
+        A(O70X_STR_ICTSTR, str_ictstr, "str");
+
+        w->ohdr[O70X_CTSTR_ICTSTR] = &w->ctstr_ictstr.ohdr;
+        w->ctstr_ictstr.ohdr.nref = 1;
+        w->ctstr_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
+        A(O70X_CTSTR_ICTSTR, ctstr_ictstr, "ctstr");
+
+        w->ohdr[O70X_ACTSTR_ICTSTR] = &w->actstr_ictstr.ohdr;
+        w->actstr_ictstr.ohdr.nref = 1;
+        w->actstr_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
+        A(O70X_ACTSTR_ICTSTR, actstr_ictstr, "actstr");
+
+        w->ohdr[O70X_ICTSTR_ICTSTR] = &w->ictstr_ictstr.ohdr;
+        w->ictstr_ictstr.ohdr.nref = 1;
+        w->ictstr_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
+        A(O70X_ICTSTR_ICTSTR, ictstr_ictstr, "ictstr");
+
+        w->ohdr[O70X_IACTSTR_ICTSTR] = &w->iactstr_ictstr.ohdr;
+        w->iactstr_ictstr.ohdr.nref = 1;
+        w->iactstr_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
+        A(O70X_IACTSTR_ICTSTR, iactstr_ictstr, "iactstr");
+
+        w->ohdr[O70X_EXCEPTION_ICTSTR] = &w->exception_ictstr.ohdr;
+        w->exception_ictstr.ohdr.nref = 1;
+        w->exception_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
+        A(O70X_EXCEPTION_ICTSTR, exception_ictstr, "exception");
+
+        w->ohdr[O70X_MODULE_ICTSTR] = &w->module_ictstr.ohdr;
+        w->module_ictstr.ohdr.nref = 1;
+        w->module_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
+        A(O70X_MODULE_ICTSTR, module_ictstr, "module");
 
         r = 0;
     }
@@ -381,6 +417,7 @@ O70_API o70_status_t C42_CALL o70_world_init
     if (r) w->aux_status = o70_world_finish(w);
 
     return r;
+#undef A
 }
 
 /* o70_world_finish *********************************************************/
