@@ -94,6 +94,7 @@ enum o70_statuses
                     executed before completing the operation */
     O70S_MISSING, /**< item/property missing */
     O70S_BAD_ARG, /**< some argument or input field has an incorrect value */
+    O70S_BAD_TYPE, /**< an object has the wrong type */
     O70S_NO_MEM, /**< allocation failed */
     O70S_IO_ERROR, /**< I/O error */
 
@@ -774,11 +775,11 @@ O70_API o70_status_t C42_CALL o70_ctstr_intern
     o70_ref_t * out
 );
 
-/* o70_ctstr_static *********************************************************/
+/* o70_ctstr *********************************************************/
 /**
  *  Allocates a new static constant string object.
  */
-O70_API o70_status_t C42_CALL o70_ctstr_static
+O70_API o70_status_t C42_CALL o70_ctstr
 (
     o70_world_t * w,
     o70_ref_t * out,
@@ -791,13 +792,13 @@ O70_API o70_status_t C42_CALL o70_ctstr_static
  *  Creates a static constant string from a given string literal.
  */
 #define O70_CTSTR(_w, _ref_ptr, _str_lit) \
-    (o70_ctstr_static((_w), (_ref_ptr), (_str_lit), sizeof(_str_lit) - 1))
+    (o70_ctstr((_w), (_ref_ptr), (_str_lit), sizeof(_str_lit) - 1))
 
-/* o70_ctstr_static_intern **************************************************/
+/* o70_ictstr **************************************************/
 /**
  *  Given a static byte buffer it returns an internalized ctstr object.
  */
-O70_API o70_status_t C42_CALL o70_ctstr_static_intern
+O70_API o70_status_t C42_CALL o70_ictstr
 (
     o70_world_t * w,
     o70_ref_t * out,
@@ -810,8 +811,7 @@ O70_API o70_status_t C42_CALL o70_ctstr_static_intern
  *  internalised static const string.
  */
 #define O70_ICTSTR(_w, _ref_ptr, _str_lit) \
-    (o70_ctstr_static_intern((_w), (_ref_ptr), \
-                             (_str_lit), sizeof(_str_lit) - 1))
+    (o70_ictstr((_w), (_ref_ptr), (_str_lit), sizeof(_str_lit) - 1))
 
 /* o70_dump_icst ************************************************************/
 /**

@@ -96,7 +96,7 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
         os = o70_ctstr_intern(&w, rj1, &rj3);
         if (os)
         {
-            c42_io8_fmt(err, "test1: failed interning rj1\n");
+            c42_io8_fmt(err, "test1: failed interning rj1: $i\n", os);
             break;
         }
         c42_io8_fmt(err, "rj3: $xd\n", rj3);
@@ -121,10 +121,10 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
         }
 
         os = o70_dump_icst(&w, out);
-        break;
     }
     while (0);
     if (os == O70S_BUG) return RCBUG;
+    if (os) rc |= RCRUN;
     osf = o70_world_finish(&w);
     if (osf)
     {

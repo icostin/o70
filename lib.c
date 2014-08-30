@@ -259,71 +259,85 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->null_class.ohdr.nref = 1;
         w->null_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->null_class.isize = sizeof(o70_object_t);
+        w->null_class.model = 0;
 
         w->ohdr[O70X_BOOL_CLASS] = &w->bool_class.ohdr;
         w->bool_class.ohdr.nref = 1;
         w->bool_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->bool_class.isize = sizeof(o70_object_t);
+        w->bool_class.model = 0;
 
         w->ohdr[O70X_INT_CLASS] = &w->dynobj_class.ohdr;
         w->int_class.ohdr.nref = 1;
         w->int_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->int_class.isize = sizeof(o70_object_t);
+        w->int_class.model = 0;
 
         w->ohdr[O70X_DYNOBJ_CLASS] = &w->dynobj_class.ohdr;
         w->dynobj_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->dynobj_class.ohdr.nref = 1;
         w->dynobj_class.isize = sizeof(o70_object_t);
+        w->dynobj_class.model = O70M_DYNOBJ;
 
         w->ohdr[O70X_CLASS_CLASS] = &w->class_class.ohdr;
         w->class_class.ohdr.nref = 1;
         w->class_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->class_class.isize = sizeof(o70_class_t);
+        w->class_class.model = O70M_DYNOBJ | O70M_CLASS;
 
         w->ohdr[O70X_ARRAY_CLASS] = &w->array_class.ohdr;
         w->array_class.ohdr.nref = 1;
         w->array_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->array_class.isize = sizeof(o70_array_t);
+        w->array_class.model = O70M_ARRAY;
 
         w->ohdr[O70X_FUNCTION_CLASS] = &w->function_class.ohdr;
         w->function_class.ohdr.nref = 1;
         w->function_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->function_class.isize = sizeof(o70_function_t);
+        w->function_class.model = O70M_FUNCTION;
 
         w->ohdr[O70X_STR_CLASS] = &w->str_class.ohdr;
         w->str_class.ohdr.nref = 1;
         w->str_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->str_class.isize = sizeof(o70_str_t);
+        w->str_class.model = O70M_STR;
 
         w->ohdr[O70X_CTSTR_CLASS] = &w->ctstr_class.ohdr;
         w->ctstr_class.ohdr.nref = 1;
         w->ctstr_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->ctstr_class.isize = sizeof(o70_ctstr_t);
+        w->ctstr_class.model = O70M_SCTSTR;
 
         w->ohdr[O70X_ACTSTR_CLASS] = &w->actstr_class.ohdr;
         w->actstr_class.ohdr.nref = 1;
         w->actstr_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->actstr_class.isize = sizeof(o70_ctstr_t);
+        w->actstr_class.model = O70M_ACTSTR;
 
         w->ohdr[O70X_ICTSTR_CLASS] = &w->ictstr_class.ohdr;
         w->ictstr_class.ohdr.nref = 1;
         w->ictstr_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->ictstr_class.isize = sizeof(o70_ctstr_t);
+        w->ictstr_class.model = O70M_SCTSTR | O70M_ICTSTR;
 
         w->ohdr[O70X_IACTSTR_CLASS] = &w->iactstr_class.ohdr;
         w->iactstr_class.ohdr.nref = 1;
         w->iactstr_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->iactstr_class.isize = sizeof(o70_ctstr_t);
+        w->iactstr_class.model = O70M_ACTSTR | O70M_ICTSTR;
 
         w->ohdr[O70X_EXCEPTION_CLASS] = &w->exception_class.ohdr;
         w->exception_class.ohdr.nref = 1;
         w->exception_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->exception_class.isize = sizeof(o70_exception_t);
+        w->exception_class.model = O70M_EXCEPTION;
 
         w->ohdr[O70X_MODULE_CLASS] = &w->module_class.ohdr;
         w->module_class.ohdr.nref = 1;
         w->module_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->module_class.isize = sizeof(o70_module_t);
+        w->module_class.model = O70M_MODULE;
 
         w->ohdr[O70X_NULL_ICTSTR] = &w->null_ictstr.ohdr;
         w->null_ictstr.ohdr.nref = 1;
@@ -500,6 +514,7 @@ static o70_status_t C42_CALL obj_alloc
     oh = w->ohdr[ox];
     oh->nref = 1;
     oh->class_ox = clox;
+    o70_ref_inc(w, O70_RTOX(clox));
     return 0;
 }
 
@@ -592,8 +607,8 @@ O70_API o70_status_t C42_CALL o70_dump_icst
     return 0;
 }
 
-/* o70_ctstr_static *********************************************************/
-O70_API o70_status_t C42_CALL o70_ctstr_static
+/* o70_ctstr *********************************************************/
+O70_API o70_status_t C42_CALL o70_ctstr
 (
     o70_world_t * w,
     o70_ref_t * out,
@@ -614,8 +629,8 @@ O70_API o70_status_t C42_CALL o70_ctstr_static
     return 0;
 }
 
-/* o70_ctstr_static_intern **************************************************/
-O70_API o70_status_t C42_CALL o70_ctstr_static_intern
+/* o70_ictstr **************************************************/
+O70_API o70_status_t C42_CALL o70_ictstr
 (
     o70_world_t * w,
     o70_ref_t * out,
@@ -639,14 +654,14 @@ O70_API o70_status_t C42_CALL o70_ctstr_static_intern
     rbte = c42_rbtree_find(&path, &w->ics.rbt, (uintptr_t) &ba);
     if (rbte == C42_RBTREE_FOUND)
     {
-        /* found the node; the key of the node is the reference to our ctstr */
+        /* found the node; the key of the node is the reference to our ictstr */
         pn = (o70_prop_node_t *) path.nodes[path.last];
         *out = r = pn->kv.key;
         o70_ref_inc(w, r);
         return 0;
     }
     /* ctstr not found, must create one */
-    os = o70_ctstr_static(w, out, ptr, len);
+    os = o70_ctstr(w, out, ptr, len);
     if (os) return os;
     /* create the node in the internalised ctstr tree */
     os = ics_node_create(w, &path, r = *out);
@@ -659,6 +674,11 @@ O70_API o70_status_t C42_CALL o70_ctstr_static_intern
         if (os2 == O70S_BUG) return os2;
         return os;
     }
+    /* replace the class */
+    o70_ref_dec(w, O70_XTOR(O70X_CTSTR_CLASS));
+    o70_ref_inc(w, O70_XTOR(O70X_ICTSTR_CLASS));
+    w->ohdr[O70_RTOX(r)]->class_ox = O70X_ICTSTR_CLASS;
+
     return 0;
 }
 
@@ -674,30 +694,46 @@ O70_API o70_status_t C42_CALL o70_ctstr_intern
     o70_prop_node_t * pn;
     uint_fast8_t rbte;
     o70_status_t os;
-    o70_ref_t r;
+    o70_ref_t r, ncx;
     o70_ctstr_t * ics;
+    o70_class_t * cls;
 
     ics = w->ot[O70_RTOX(in)];
+    cls = w->ot[ics->ohdr.class_ox];
+    if ((cls->model & (O70M_SCTSTR | O70M_ACTSTR)) == 0) return O70S_BAD_TYPE;
 
-    /* now do the lookup */
-    rbte = c42_rbtree_find(&path, &w->ics.rbt, (uintptr_t) &ics->data);
-    if (rbte == C42_RBTREE_FOUND)
+    if ((cls->model & O70M_ICTSTR)) r = in;
+    else
     {
-        /* found the node; the key of the node is the reference to our ctstr */
-        pn = (o70_prop_node_t *) path.nodes[path.last];
-        *out = r = pn->kv.key;
-        o70_ref_inc(w, r);
-        return 0;
+        rbte = c42_rbtree_find(&path, &w->ics.rbt, (uintptr_t) &ics->data);
+        if (rbte == C42_RBTREE_FOUND)
+        {
+            /* found the node; the key of the node is the reference 
+             * to our ictstr */
+            pn = (o70_prop_node_t *) path.nodes[path.last];
+            r = pn->kv.key;
+        }
+        else
+        {
+            /* we must add current ctstr to the ics tree and change it to 
+             * ictstr/iactstr */
+            r = in;
+            /* create the node in the internalised ctstr tree */
+            os = ics_node_create(w, &path, in);
+            if (os) return os;
+            if (ics->ohdr.class_ox == O70X_CTSTR_CLASS) 
+                ncx = O70X_ICTSTR_CLASS;
+            else if (ics->ohdr.class_ox == O70X_ACTSTR_CLASS)
+                ncx = O70X_IACTSTR_CLASS;
+            else return O70S_TODO; /* in case we will have other types of ctstr derivates */
+            o70_ref_dec(w, O70_XTOR(ics->ohdr.class_ox));
+            o70_ref_inc(w, O70_XTOR(ncx));
+            ics->ohdr.class_ox = ncx;
+        }
     }
-    *out = in;
-    /* create the node in the internalised ctstr tree */
-    os = ics_node_create(w, &path, in);
-    if (os)
-    {
-        /* failed to create the node */
-        if (os == O70S_BUG) return os;
-        return os;
-    }
+
+    *out = r;
+    o70_ref_inc(w, r);
     return 0;
 }
 
