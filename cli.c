@@ -7,6 +7,12 @@
 #define RCOUT 8
 #define RCBUG 127
 
+#define E(...) ((void) (c42_io8_fmt(err, "$s:$i: ", __FILE__, __LINE__) \
+    || c42_io8_fmt(err, __VA_ARGS__)))
+
+#define ZOB(_expr) \
+    if (!(_expr)) ; else { E("expr ($s) is not zero\n", #_expr); break; }
+
 typedef struct test_s test_t;
 struct test_s
 {
@@ -145,6 +151,7 @@ static uint_fast8_t C42_CALL test2 (c42_svc_t * svc, c42_clia_t * clia)
     c42_io8_t * out = &clia->stdio.out;
     c42_io8_t * err = &clia->stdio.err;
     o70_status_t os, osf;
+    o70_ref_t obj;
     uint_fast8_t rc = 0;
 
     C42_VAR_CLEAR(ini);
@@ -160,10 +167,12 @@ static uint_fast8_t C42_CALL test2 (c42_svc_t * svc, c42_clia_t * clia)
     }
     do
     {
+        ZOB(os = o70_dynobj_create(&w, &obj));
         os = 0;
     }
     while (0);
     if (os == O70S_BUG) return RCBUG;
+    if (os) rc |= RCRUN;
     osf = o70_world_finish(&w);
     if (osf)
     {

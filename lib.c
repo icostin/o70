@@ -2,9 +2,14 @@
 
 #if _DEBUG
 #define L(...) (c42_io8_fmt(w->err, __VA_ARGS__))
+#define NZDBGCHK(_expr) if ((_expr)) ; else do { L("*** BUG *** $s:$i:$s: ($s) is zero\n", __FILE__, __LINE__, __FUNCTION__, #_expr); return O70S_BUG; } while (0)
+#define ZDBGCHK(_expr) if (!(_expr)) ; else do { L("*** BUG *** $s:$i:$s: ($s) is non-zero\n", __FILE__, __LINE__, __FUNCTION__, #_expr); return O70S_BUG; } while (0)
 #else
 #define L(...)
+#define NZDBGCHK(_expr)
+#define ZDBGCHK(_expr)
 #endif
+#define DBGASSERT NZDBGCHK
 
 //#define L(...)
 
@@ -64,6 +69,20 @@ static o70_status_t C42_CALL obj_alloc
 static void C42_CALL prop_bag_init
 (
     o70_prop_bag_t * bag
+);
+
+/* prop_bag_get *************************************************************/
+/**
+ *  Retrieves a property.
+ *  @retval 0 found it
+ *  @retval O70S_MISSING no property by that name
+ *  @warning this DOES NOT increment the ref count for the value when found
+ */
+static o70_status_t C42_CALL prop_bag_get
+(
+    o70_prop_bag_t * bag,
+    o70_ref_t name,
+    o70_ref_t * value
 );
 
 /* prop_key_cmp *************************************************************/
@@ -132,12 +151,15 @@ O70_API uint8_t const * C42_CALL o70_status_name (o70_status_t sc)
         X(O70S_OK);
         X(O70S_PENDING);
         X(O70S_BAD_ARG);
+        X(O70S_BAD_TYPE);
         X(O70S_NO_MEM);
+        X(O70S_IO_ERROR);
 
         X(O70S_BUG);
         X(O70S_TODO);
     }
     return (uint8_t const *) "O70S_unspecified";
+#undef X
 }
 
 /* ics_key_cmp **************************************************************/
@@ -154,10 +176,7 @@ static uint_fast8_t C42_CALL ics_key_cmp
     o70_world_t * w = context;
     int c;
 
-    //L("cmp_in k:$xp, node:$xp\n", key, node);
-    //L("key: '$.*es'\n", key_str->n, key_str->a);
-    //L("node obj ref: $xd\n", pn->kv.key);
-    //pn = C42_STRUCT_FROM_FIELD_PTR(o70_prop_node_t, rbtn, node);
+    NZDBGCHK(O70_IS_OREF(pn->kv.key));
     cs = w->ot[O70_RTOX(pn->kv.key)];
 
     if (key_str->n != cs->data.n)
@@ -180,7 +199,7 @@ static o70_status_t C42_CALL ics_node_create
     mae = C42_MA_VAR_ALLOC(&w->ma, node);
     //L("prop_node alloc: $xp (mae=$i)\n", node, mae);
     if (mae) return mae == C42_MA_CORRUPT ? O70S_BUG : O70S_NO_MEM;
-    if (!node) return O70S_BUG;
+    NZDBGCHK(node);
     node->kv.val = node->kv.key = ctstr;
     c42_rbtree_insert(path, &node->rbtn);
     o70_ref_inc(w, ctstr);
@@ -698,6 +717,7 @@ O70_API o70_status_t C42_CALL o70_ctstr_intern
     o70_ctstr_t * ics;
     o70_class_t * cls;
 
+    if (!O70_IS_OREF(in)) return O70S_BAD_TYPE;
     ics = w->ot[O70_RTOX(in)];
     cls = w->ot[ics->ohdr.class_ox];
     if ((cls->model & (O70M_SCTSTR | O70M_ACTSTR)) == 0) return O70S_BAD_TYPE;
@@ -760,6 +780,31 @@ static void C42_CALL prop_bag_init
     c42_rbtree_init(&bag->rbt, prop_key_cmp, NULL);
 }
 
+/* prop_bag_get *************************************************************/
+static o70_status_t C42_CALL prop_bag_get
+(
+    o70_prop_bag_t * bag,
+    o70_ref_t name,
+    o70_ref_t * value
+)
+{
+    c42_rbtree_path_t path;
+    uint_fast8_t rbte;
+    o70_prop_node_t * n;
+    rbte = c42_rbtree_find(&path, &bag->rbt, (uintptr_t) name);
+#if _DEBUG
+    if (!(rbte == C42_RBTREE_FOUND || rbte == C42_RBTREE_NOT_FOUND))
+        return O70S_BUG;
+#endif
+    if (rbte == C42_RBTREE_NOT_FOUND) return O70S_MISSING;
+    n = (o70_prop_node_t *) path.nodes[path.last];
+#if _DEBUG
+    if (n->kv.key != name) return O70S_BUG;
+#endif
+    *value = n->kv.val;
+    return 0;
+}
+
 /* o70_dynobj_create ********************************************************/
 O70_API o70_status_t C42_CALL o70_dynobj_create
 (
@@ -792,11 +837,27 @@ O70_API o70_status_t C42_CALL o70_dynobj_raw_get
     o70_ref_t * value
 )
 {
-    (void) w;
-    (void) obj;
-    (void) name;
-    (void) value;
-    return O70S_TODO;
+    o70_dynobj_t * o;
+    o70_class_t * c;
+    o70_status_t os;
+    if (!O70_IS_OREF(obj)) return O70S_BAD_TYPE;
+    o = w->ot[O70_RTOX(obj)];
+    c = w->ot[o->ohdr.class_ox];
+    if (!(c->model & O70M_ICTSTR))
+    {
+        os = o70_ctstr_intern(w, obj, &obj);
+        if (os)
+        {
+            L("failed to internalize obj_$xd\n", obj);
+            return os;
+        }
+        o = w->ot[O70_RTOX(obj)];
+        // c = w->ot[o->ohdr.class_ox];
+    }
+    os = prop_bag_get(&o->fields, name, value);
+    if (os) return os;
+    o70_ref_inc(w, *value);
+    return 0;
 }
 
 
