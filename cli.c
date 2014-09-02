@@ -151,7 +151,7 @@ static uint_fast8_t C42_CALL test2 (c42_svc_t * svc, c42_clia_t * clia)
     c42_io8_t * out = &clia->stdio.out;
     c42_io8_t * err = &clia->stdio.err;
     o70_status_t os, osf;
-    o70_ref_t obj;
+    o70_ref_t obj, afi;
     uint_fast8_t rc = 0;
 
     C42_VAR_CLEAR(ini);
@@ -168,6 +168,8 @@ static uint_fast8_t C42_CALL test2 (c42_svc_t * svc, c42_clia_t * clia)
     do
     {
         ZOB(os = o70_dynobj_create(&w, &obj));
+        ZOB(os = O70_CTSTR(&w, &afi, "a_field"));
+        ZOB(os = o70_dynobj_raw_put(&w, obj, afi, O70R_NULL));
         os = 0;
     }
     while (0);

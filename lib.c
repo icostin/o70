@@ -71,18 +71,36 @@ static void C42_CALL prop_bag_init
     o70_prop_bag_t * bag
 );
 
-/* prop_bag_get *************************************************************/
+/* prop_bag_peek *************************************************************/
 /**
  *  Retrieves a property.
  *  @retval 0 found it
  *  @retval O70S_MISSING no property by that name
  *  @warning this DOES NOT increment the ref count for the value when found
  */
-static o70_status_t C42_CALL prop_bag_get
+static o70_status_t C42_CALL prop_bag_peek
 (
     o70_prop_bag_t * bag,
     o70_ref_t name,
     o70_ref_t * value
+);
+
+/* prop_bag_put *************************************************************/
+/**
+ *  Changes/adds a property.
+ *  @note @a name will get the ref count incremented if it was not part of the
+ *  bag.
+ *  @note @a value will have the ref count incremented.
+ *  @retval 0 ok
+ *  @retval O70S_NO_MEM failed allocating memory to store the new property
+ *  @retval O70S_BUG bug found; don't touch anything, exit asap
+ */
+static o70_status_t C42_CALL prop_bag_put
+(
+    o70_world_t * w,
+    o70_prop_bag_t * bag,
+    o70_ref_t name,
+    o70_ref_t value
 );
 
 /* prop_key_cmp *************************************************************/
@@ -199,7 +217,7 @@ static o70_status_t C42_CALL ics_node_create
     mae = C42_MA_VAR_ALLOC(&w->ma, node);
     //L("prop_node alloc: $xp (mae=$i)\n", node, mae);
     if (mae) return mae == C42_MA_CORRUPT ? O70S_BUG : O70S_NO_MEM;
-    NZDBGCHK(node);
+    DBGASSERT(node);
     node->kv.val = node->kv.key = ctstr;
     c42_rbtree_insert(path, &node->rbtn);
     o70_ref_inc(w, ctstr);
@@ -233,7 +251,7 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->err = ini->err;
         //L("world init\n");
 
-        L("t=$x/4z, b=$x/4z, c=$x/4z\n", 
+        L("t=$x/4z, b=$x/4z, c=$x/4z\n",
                        ini->ma_total_limit && ini->ma_total_limit < SIZE_MAX
                        ? (size_t) ini->ma_total_limit : SIZE_MAX,
                        ini->ma_block_limit && ini->ma_block_limit < SIZE_MAX
@@ -617,7 +635,7 @@ O70_API o70_status_t C42_CALL o70_dump_icst
         pn = (o70_prop_node_t *) n;
         cs = w->ot[O70_RTOX(pn->kv.key)];
         e = c42_io8_fmt(o, "$.*es\n", cs->data.n, cs->data.a);
-        if (e) 
+        if (e)
         {
             L("o70_dump_icst: print failed: $b\n", e);
             return O70S_IO_ERROR;
@@ -728,20 +746,20 @@ O70_API o70_status_t C42_CALL o70_ctstr_intern
         rbte = c42_rbtree_find(&path, &w->ics.rbt, (uintptr_t) &ics->data);
         if (rbte == C42_RBTREE_FOUND)
         {
-            /* found the node; the key of the node is the reference 
+            /* found the node; the key of the node is the reference
              * to our ictstr */
             pn = (o70_prop_node_t *) path.nodes[path.last];
             r = pn->kv.key;
         }
         else
         {
-            /* we must add current ctstr to the ics tree and change it to 
+            /* we must add current ctstr to the ics tree and change it to
              * ictstr/iactstr */
             r = in;
             /* create the node in the internalised ctstr tree */
             os = ics_node_create(w, &path, in);
             if (os) return os;
-            if (ics->ohdr.class_ox == O70X_CTSTR_CLASS) 
+            if (ics->ohdr.class_ox == O70X_CTSTR_CLASS)
                 ncx = O70X_ICTSTR_CLASS;
             else if (ics->ohdr.class_ox == O70X_ACTSTR_CLASS)
                 ncx = O70X_IACTSTR_CLASS;
@@ -780,8 +798,8 @@ static void C42_CALL prop_bag_init
     c42_rbtree_init(&bag->rbt, prop_key_cmp, NULL);
 }
 
-/* prop_bag_get *************************************************************/
-static o70_status_t C42_CALL prop_bag_get
+/* prop_bag_peek ************************************************************/
+static o70_status_t C42_CALL prop_bag_peek
 (
     o70_prop_bag_t * bag,
     o70_ref_t name,
@@ -805,6 +823,46 @@ static o70_status_t C42_CALL prop_bag_get
     return 0;
 }
 
+/* prop_bag_put *************************************************************/
+static o70_status_t C42_CALL prop_bag_put
+(
+    o70_world_t * w,
+    o70_prop_bag_t * bag,
+    o70_ref_t name,
+    o70_ref_t value
+)
+{
+    c42_rbtree_path_t path;
+    uint_fast8_t rbte;
+    o70_prop_node_t * n;
+    o70_status_t os;
+
+    rbte = c42_rbtree_find(&path, &bag->rbt, (uintptr_t) name);
+#if _DEBUG
+    if (!(rbte == C42_RBTREE_FOUND || rbte == C42_RBTREE_NOT_FOUND))
+        return O70S_BUG;
+#endif
+    if (rbte == C42_RBTREE_FOUND)
+    {
+        n = (o70_prop_node_t *) path.nodes[path.last];
+        os = o70_ref_dec(w, n->kv.val);
+        if (os) return os;
+    }
+    else
+    {
+        /* alloc one cell */
+        int mae;
+        mae = C42_MA_VAR_ALLOC(&w->ma, n);
+        if (mae) return mae == C42_MA_CORRUPT ? O70S_BUG : O70S_NO_MEM;
+        DBGASSERT(n);
+        n->kv.key = name;
+        o70_ref_inc(w, name);
+    }
+    n->kv.val = value;
+    o70_ref_inc(w, value);
+    return 0;
+}
+
 /* o70_dynobj_create ********************************************************/
 O70_API o70_status_t C42_CALL o70_dynobj_create
 (
@@ -818,7 +876,7 @@ O70_API o70_status_t C42_CALL o70_dynobj_create
     os = obj_alloc(w, &ox, O70X_DYNOBJ_CLASS);
     if (os)
     {
-        L("o70_obj_create: obj_alloc failed: $s = $xd\n", 
+        L("o70_obj_create: obj_alloc failed: $s = $xd\n",
           o70_status_name(os), os);
         return os;
     }
@@ -843,23 +901,12 @@ O70_API o70_status_t C42_CALL o70_dynobj_raw_get
     if (!O70_IS_OREF(obj)) return O70S_BAD_TYPE;
     o = w->ot[O70_RTOX(obj)];
     c = w->ot[o->ohdr.class_ox];
-    if (!(c->model & O70M_ICTSTR))
-    {
-        os = o70_ctstr_intern(w, obj, &obj);
-        if (os)
-        {
-            L("failed to internalize obj_$xd\n", obj);
-            return os;
-        }
-        o = w->ot[O70_RTOX(obj)];
-        // c = w->ot[o->ohdr.class_ox];
-    }
-    os = prop_bag_get(&o->fields, name, value);
+    if (!(c->model & O70M_DYNOBJ)) return O70S_BAD_TYPE;
+    os = prop_bag_peek(&o->fields, name, value);
     if (os) return os;
     o70_ref_inc(w, *value);
     return 0;
 }
-
 
 /* o70_dynobj_raw_put *******************************************************/
 O70_API o70_status_t C42_CALL o70_dynobj_raw_put
@@ -870,11 +917,17 @@ O70_API o70_status_t C42_CALL o70_dynobj_raw_put
     o70_ref_t value
 )
 {
-    (void) w;
-    (void) obj;
-    (void) name;
-    (void) value;
-    return O70S_TODO;
-}
+    o70_dynobj_t * o;
+    o70_status_t os, osd;
+    o70_ref_t prop;
 
+    if (!(o70_model(w, obj) & O70M_DYNOBJ)) return O70S_BAD_TYPE;
+    o = w->ot[O70_RTOX(obj)];
+    os = o70_ctstr_intern(w, name, &prop);
+    if (os) return os;
+    os = prop_bag_put(w, &o->fields, prop, value);
+    osd = o70_ref_dec(w, prop);
+    if (osd == O70S_BUG) return O70S_BUG;
+    return os;
+}
 

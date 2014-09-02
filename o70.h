@@ -35,6 +35,18 @@
  */
 #define O70_IS_OREF(_ref) (!((_ref) & 1))
 
+/* O70_IS_FASTINT ***************************************************************/
+/**
+ *  Returns true if and only if the given reference points to an int.
+ */
+#define O70_IS_FASTINT(_ref) ((_ref) & 1)
+
+/* O70R_FASTINT *************************************************************/
+/**
+ *  Converts an int value to a fastint reference.
+ */
+#define O70R_FASTINT(_value) ((_value) << 1) | 1)
+
 /* Object model constants */
 #define O70M_DYNOBJ     (1 << 0) /**< regular object (with a property bag) */
 #define O70M_CLASS      (1 << 1) /**< class model */
@@ -46,6 +58,11 @@
 #define O70M_FUNCTION   (1 << 7) 
 #define O70M_EXCEPTION  (1 << 8) 
 #define O70M_MODULE     (1 << 9)
+
+/* hardcoded refs */
+#define O70R_NULL       (O70_XTOR(O70X_NULL))
+#define O70R_FALSE      (O70_XTOR(O70X_FALSE))
+#define O70R_TRUE       (O70_XTOR(O70X_TRUE))
 
 /* enums {{{1 */
 /* o70_opcodes **************************************************************/
@@ -98,7 +115,7 @@ enum o70_statuses
     O70S_NO_MEM, /**< allocation failed */
     O70S_IO_ERROR, /**< I/O error */
 
-    O70S_BUG = 0x70,
+    O70S_BUG = 0x40,
     O70S_TODO,
 };
 
@@ -707,6 +724,8 @@ O70_API o70_status_t C42_CALL _o70_obj_destroy (o70_world_t * w);
  *  TODO: this func should just queue the object in a destroy list and have 
  *  another api for killing - this will avoid nesting too many calls on the
  *  real stack
+ *  @retval 0 all ok
+ *  @retval O70S_BUG bug
  */
 C42_INLINE o70_status_t o70_ref_dec
 (
@@ -731,6 +750,34 @@ C42_INLINE o70_status_t o70_ref_dec
     }
     return 0;
 }
+
+/* o70_class_ptr ************************************************************/
+/**
+ *  Returns the pointer to the class corresponding to the given object.
+ *  @note this does not change the ref count for the returned class.
+ */
+C42_INLINE o70_class_t * o70_class_ptr
+(
+    o70_world_t * w,
+    o70_ref_t r
+)
+{
+    return (O70_IS_OREF(r)) ? w->ot[w->ohdr[O70_RTOX(r)]->class_ox] : &w->int_class;
+}
+
+/* o70_model ****************************************************************/
+/**
+ *  Returns the model of the given reference.
+ */
+C42_INLINE int o70_model
+(
+    o70_world_t * w,
+    o70_ref_t r
+)
+{
+    return o70_class_ptr(w, r)->model;
+}
+
 
 /* o70_flow_create **********************************************************/
 /**
@@ -767,6 +814,7 @@ O70_API o70_status_t C42_CALL o70_flow_destroy
  *  Returns the 'internalised' constant string.
  *  Internalised strings have the property that if 2 strings have the same
  *  content then their internalised strings are the same object.
+ *  @note the returned reference will have its ref count incremented.
  */
 O70_API o70_status_t C42_CALL o70_ctstr_intern
 (
@@ -844,6 +892,7 @@ O70_API o70_status_t C42_CALL o70_dynobj_create
  *  @param value [out] will get value of property on success
  *  @retval 0 property found and value returned
  *  @retval O70S_MISSING property not found
+ *  @retval O70S_BUG critical error
  */
 O70_API o70_status_t C42_CALL o70_dynobj_raw_get
 (
@@ -864,6 +913,9 @@ O70_API o70_status_t C42_CALL o70_dynobj_raw_get
  *  @note the ref count of @a value will be incremented
  *  @note if the property did not exist in the object then the ref count of
  *      @a name will be incremented
+ *  @retval 0 ok
+ *  @retval O70S_NO_MEM failed allocating memory to store the new property
+ *  @retval O70S_BUG bug found; don't touch anything, exit asap
  */
 O70_API o70_status_t C42_CALL o70_dynobj_raw_put
 (
