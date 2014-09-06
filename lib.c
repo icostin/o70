@@ -168,6 +168,7 @@ O70_API uint8_t const * C42_CALL o70_status_name (o70_status_t sc)
     {
         X(O70S_OK);
         X(O70S_PENDING);
+        X(O70S_MISSING);
         X(O70S_BAD_ARG);
         X(O70S_BAD_TYPE);
         X(O70S_NO_MEM);
@@ -856,6 +857,7 @@ static o70_status_t C42_CALL prop_bag_put
         if (mae) return mae == C42_MA_CORRUPT ? O70S_BUG : O70S_NO_MEM;
         DBGASSERT(n);
         n->kv.key = name;
+        c42_rbtree_insert(&path, &n->rbtn);
         o70_ref_inc(w, name);
     }
     n->kv.val = value;
@@ -928,6 +930,6 @@ O70_API o70_status_t C42_CALL o70_dynobj_raw_put
     os = prop_bag_put(w, &o->fields, prop, value);
     osd = o70_ref_dec(w, prop);
     if (osd == O70S_BUG) return O70S_BUG;
-    return os;
+    return os ? os : osd;
 }
 

@@ -12,6 +12,8 @@
 
 #define ZOB(_expr) \
     if (!(_expr)) ; else { E("expr ($s) is not zero\n", #_expr); break; }
+#define TOB(_expr) \
+    if ((_expr)) ; else { E("expr ($s) is not zero\n", #_expr); break; }
 
 typedef struct test_s test_t;
 struct test_s
@@ -21,13 +23,13 @@ struct test_s
 };
 
 static uint_fast8_t C42_CALL run_test (c42_svc_t * svc, c42_clia_t * clia);
+static uint_fast8_t C42_CALL test0 (c42_svc_t * svc, c42_clia_t * clia);
 static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia);
-static uint_fast8_t C42_CALL test2 (c42_svc_t * svc, c42_clia_t * clia);
 
 static test_t tests[] =
 {
-    { test1, "ctstr" },
-    { test2, "prop" },
+    { test0, "ctstr" },
+    { test1, "prop" },
 };
 
 /* c42_main *****************************************************************/
@@ -44,8 +46,8 @@ uint_fast8_t C42_CALL c42_main
     return 0;
 }
 
-/* test1 ********************************************************************/
-static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
+/* test0 ********************************************************************/
+static uint_fast8_t C42_CALL test0 (c42_svc_t * svc, c42_clia_t * clia)
 {
     o70_init_t ini;
     o70_world_t w;
@@ -61,7 +63,7 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
     os = o70_world_init(&w, &ini);
     if (os)
     {
-        c42_io8_fmt(err, "o70 test2: failed initialising world: $s = $b\n", 
+        c42_io8_fmt(err, "o70 test1: failed initialising world: $s = $b\n", 
                     o70_status_name(os), os);
         return RCINI;
     }
@@ -73,7 +75,7 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
         os = O70_CTSTR(&w, &rj1, "jeton");
         if (os)
         {
-            c42_io8_fmt(err, "test1: failed creating static constant string "
+            c42_io8_fmt(err, "test0: failed creating static constant string "
                         "'jeton': $s = $b\n", o70_status_name(os), os);
             break;
         }
@@ -82,7 +84,7 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
         os = O70_ICTSTR(&w, &rb, "beton");
         if (os)
         {
-            c42_io8_fmt(err, "test1: failed creating internalised static "
+            c42_io8_fmt(err, "test0: failed creating internalised static "
                         "constant string 'beton': $s = $b\n", o70_status_name(os),
                         os);
             break;
@@ -92,7 +94,7 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
         os = O70_ICTSTR(&w, &rj2, "jeton");
         if (os)
         {
-            c42_io8_fmt(err, "test1: failed creating internalised static "
+            c42_io8_fmt(err, "test0: failed creating internalised static "
                         "constant string 'beton': $s = $b\n", o70_status_name(os),
                         os);
             break;
@@ -102,7 +104,7 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
         os = o70_ctstr_intern(&w, rj1, &rj3);
         if (os)
         {
-            c42_io8_fmt(err, "test1: failed interning rj1: $i\n", os);
+            c42_io8_fmt(err, "test0: failed interning rj1: $i\n", os);
             break;
         }
         c42_io8_fmt(err, "rj3: $xd\n", rj3);
@@ -110,19 +112,19 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
         os = o70_ref_dec(&w, rb);
         if (os)
         {
-            c42_io8_fmt(err, "test1: failed dereferencing 'beton'\n");
+            c42_io8_fmt(err, "test0: failed dereferencing 'beton'\n");
             break;
         }
         os = o70_ref_dec(&w, rj1);
         if (os)
         {
-            c42_io8_fmt(err, "test1: failed dereferencing 'jeton'\n");
+            c42_io8_fmt(err, "test0: failed dereferencing 'jeton'\n");
             break;
         }
         os = o70_ref_dec(&w, rj2);
         if (os)
         {
-            c42_io8_fmt(err, "test1: failed dereferencing intern 'jeton'\n");
+            c42_io8_fmt(err, "test0: failed dereferencing intern 'jeton'\n");
             break;
         }
 
@@ -134,7 +136,7 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
     osf = o70_world_finish(&w);
     if (osf)
     {
-        c42_io8_fmt(err, "o70 test1: failed finishing world: $s = $b\n",
+        c42_io8_fmt(err, "o70 test0: failed finishing world: $s = $b\n",
                     o70_status_name(osf), osf);
     }
 
@@ -143,16 +145,16 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
     return rc;
 }
 
-/* test2 ********************************************************************/
-static uint_fast8_t C42_CALL test2 (c42_svc_t * svc, c42_clia_t * clia)
+/* test1 ********************************************************************/
+static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
 {
     o70_init_t ini;
     o70_world_t w;
     c42_io8_t * out = &clia->stdio.out;
     c42_io8_t * err = &clia->stdio.err;
     o70_status_t os, osf;
-    o70_ref_t obj, afi;
-    uint_fast8_t rc = 0;
+    o70_ref_t obj, afi, bfi, cfi, v;
+    uint_fast8_t rc = 0, ok = 0;
 
     C42_VAR_CLEAR(ini);
     ini.ma = &svc->ma;
@@ -161,7 +163,7 @@ static uint_fast8_t C42_CALL test2 (c42_svc_t * svc, c42_clia_t * clia)
     os = o70_world_init(&w, &ini);
     if (os)
     {
-        c42_io8_fmt(err, "o70 test2: failed initialising world: $s = $b\n", 
+        c42_io8_fmt(err, "o70 test1: failed initialising world: $s = $b\n", 
                     o70_status_name(os), os);
         return RCINI;
     }
@@ -170,15 +172,30 @@ static uint_fast8_t C42_CALL test2 (c42_svc_t * svc, c42_clia_t * clia)
         ZOB(os = o70_dynobj_create(&w, &obj));
         ZOB(os = O70_CTSTR(&w, &afi, "a_field"));
         ZOB(os = o70_dynobj_raw_put(&w, obj, afi, O70R_NULL));
-        os = 0;
+        ZOB(os = o70_dynobj_raw_put(&w, obj, afi, O70R_FASTINT(1)));
+        ZOB(os = O70_CTSTR(&w, &bfi, "bfi"));
+        ZOB(os = o70_dynobj_raw_put(&w, obj, bfi, O70R_TRUE));
+        ZOB(os = O70_CTSTR(&w, &cfi, "cfld"));
+        ZOB(os = o70_dynobj_raw_put(&w, obj, cfi, O70R_FALSE));
+        ZOB(os = o70_dynobj_raw_get(&w, obj, cfi, &v));
+        TOB(v == O70R_FALSE);
+        ZOB(os = o70_dynobj_raw_get(&w, obj, bfi, &v));
+        TOB(v == O70R_TRUE);
+        ZOB(os = o70_dynobj_raw_get(&w, obj, afi, &v));
+        TOB(v == O70R_FASTINT(1));
+        ok = 1;
     }
     while (0);
     if (os == O70S_BUG) return RCBUG;
-    if (os) rc |= RCRUN;
+    if (!ok) 
+    {
+        c42_io8_fmt(err, "o70 test1: last error $s = $b\n", o70_status_name(os), os);
+        rc |= RCRUN;
+    }
     osf = o70_world_finish(&w);
     if (osf)
     {
-        c42_io8_fmt(err, "o70 test2: failed finishing world: $s = $b\n",
+        c42_io8_fmt(err, "o70 test1: failed finishing world: $s = $b\n",
                     o70_status_name(osf), osf);
     }
 
@@ -225,9 +242,9 @@ static uint_fast8_t C42_CALL run_test (c42_svc_t * svc, c42_clia_t * clia)
 
     // do
     // {
-    //     r = test1(svc, clia);
+    //     r = test0(svc, clia);
     //     if (r) c42_io8_fmt(err, "o70 test: test #1 failed\n");
-    //     r = test2(svc, clia);
+    //     r = test1(svc, clia);
     //     if (r) c42_io8_fmt(err, "o70 test: test #2 failed\n");
     // }
     // while (0);

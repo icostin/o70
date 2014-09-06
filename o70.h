@@ -45,7 +45,7 @@
 /**
  *  Converts an int value to a fastint reference.
  */
-#define O70R_FASTINT(_value) ((_value) << 1) | 1)
+#define O70R_FASTINT(_value) (((_value) << 1) | 1)
 
 /* Object model constants */
 #define O70M_DYNOBJ     (1 << 0) /**< regular object (with a property bag) */
