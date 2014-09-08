@@ -422,8 +422,13 @@ struct o70_ohdr_s
 {
     union
     {
-        uint32_t nref; /**< number of references to the object */
-        uint32_t ndx; /**< next destroy index */
+        int32_t nref; 
+        /**< number of references to the object; if this is
+            negative it means the object is in the destroy list and should not
+            have references to it from objects that are not collected as well;
+            use ~ndx for the next object index in the destroy list.
+            */
+        int32_t ndx; /**< next destroy index */
     };
     uint32_t class_ox; /**< object index for current object's class */
 };
@@ -734,21 +739,29 @@ C42_INLINE o70_status_t o70_ref_dec
 )
 {
     uint32_t ox;
-    o70_status_t st;
 
-    if (O70_IS_OREF(oref)) 
+    /* if not an obj ref then do nothing */
+    if (!O70_IS_OREF(oref)) return 0;
+    ox = O70_RTOX(oref);
+    /* most common branch: decrement ref count which remains positive */
+    if (w->ohdr[ox]->nref > 1)
     {
-        ox = O70_RTOX(oref);
-        if (!(w->ohdr[ox]->nref -= 1))
-        {
-            if (ox < O70X__COUNT) return O70S_BUG;
-            w->ohdr[ox]->ndx = w->fdx;
-            w->fdx = ox;
-            st = _o70_obj_destroy(w);
-            return st;
-        }
+        w->ohdr[ox]->nref -= 1;
+        return 0;
     }
-    return 0;
+    /* if the object is already in the destroy chain then leave it untouched */
+    if (w->ohdr[ox]->nref < 0) return 0;
+
+    /* if we got here then the object just got its last reference removed;
+     * we must add it to the destroy chain */
+#if _DEBUG
+    if (w->ohdr[ox]->nref != 1) return O70S_BUG;
+    if (ox < O70X__COUNT) return O70S_BUG;
+#endif
+    w->ohdr[ox]->ndx = ~w->fdx;
+    w->fdx = ox;
+    
+    return _o70_obj_destroy(w);
 }
 
 /* o70_class_ptr ************************************************************/

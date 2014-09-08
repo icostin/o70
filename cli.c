@@ -183,6 +183,9 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
         TOB(v == O70R_TRUE);
         ZOB(os = o70_dynobj_raw_get(&w, obj, afi, &v));
         TOB(v == O70R_FASTINT(1));
+        TOB(w.ohdr[O70_RTOX(obj)]->nref == 1);
+        ZOB(os = o70_ref_dec(&w, obj));
+        TOB(w.ffx = O70_RTOX(obj));
         ok = 1;
     }
     while (0);

@@ -71,6 +71,13 @@ static void C42_CALL prop_bag_init
     o70_prop_bag_t * bag
 );
 
+static o70_status_t C42_CALL prop_bag_finish
+(
+    o70_world_t * w,
+    o70_prop_bag_t * bag,
+    int deref
+);
+
 /* prop_bag_peek *************************************************************/
 /**
  *  Retrieves a property.
@@ -116,6 +123,13 @@ static uint_fast8_t C42_CALL prop_key_cmp
     uintptr_t key,
     c42_rbtree_node_t * node,
     void * restrict context
+);
+
+/* dynobj_finish ************************************************************/
+static o70_status_t C42_CALL dynobj_finish
+(
+    o70_world_t * w,
+    o70_ref_t o
 );
 
 /* o70_lib_name *************************************************************/
@@ -305,7 +319,7 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->bool_class.isize = sizeof(o70_object_t);
         w->bool_class.model = 0;
 
-        w->ohdr[O70X_INT_CLASS] = &w->dynobj_class.ohdr;
+        w->ohdr[O70X_INT_CLASS] = &w->int_class.ohdr;
         w->int_class.ohdr.nref = 1;
         w->int_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->int_class.isize = sizeof(o70_object_t);
@@ -314,8 +328,9 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->ohdr[O70X_DYNOBJ_CLASS] = &w->dynobj_class.ohdr;
         w->dynobj_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->dynobj_class.ohdr.nref = 1;
-        w->dynobj_class.isize = sizeof(o70_object_t);
+        w->dynobj_class.isize = sizeof(o70_dynobj_t);
         w->dynobj_class.model = O70M_DYNOBJ;
+        w->dynobj_class.finish = dynobj_finish;
 
         w->ohdr[O70X_CLASS_CLASS] = &w->class_class.ohdr;
         w->class_class.ohdr.nref = 1;
@@ -480,9 +495,17 @@ O70_API o70_status_t C42_CALL o70_world_finish
 {
     uint_fast8_t mae;
     o70_status_t rs = 0;
+    size_t i, j;
 
+    L("o70_world_finish: starting\n");
     if (w->om)
     {
+        for (i = w->ffx; i < w->on; i = j)
+        {
+            j = w->nfx[i];
+            w->nfx[i] = 0;
+        }
+
         mae = C42_MA_ARRAY_FREE(&w->ma, w->ohdr, w->om);
         if (mae) return O70S_BUG;
         w->om = 0;
@@ -495,6 +518,14 @@ O70_API o70_status_t C42_CALL o70_world_finish
         w->mm = 0;
     }
 
+    if (w->mactx.ts)
+    {
+        L("*** BUG *** memory leaks: $z bytes in $z blocks.\n", 
+          w->mactx.ts, w->mactx.nb);
+        rs = O70S_BUG;
+    }
+
+    L("o70_world_finish: done with status $s=$b\n", o70_status_name(rs), rs);
     return rs;
 }
 
@@ -547,7 +578,8 @@ static o70_status_t C42_CALL obj_alloc
     ox = *out;
     cls = w->ot[clox];
     mae = c42_ma_alloc(&w->ma, w->ot + ox, 1, cls->isize);
-    L("obj_alloc: isize=$xz, mae=$i\n", cls->isize, mae);
+    L("obj_alloc: isize=$xz, mae=$i, ox=$xi, r=$xi\n", 
+      cls->isize, mae, ox, O70_XTOR(ox));
     if (mae) { return mae == C42_MA_CORRUPT ? O70S_BUG : O70S_NO_MEM; }
     oh = w->ohdr[ox];
     oh->nref = 1;
@@ -565,25 +597,34 @@ O70_API o70_status_t C42_CALL _o70_obj_destroy (o70_world_t * w)
     o70_status_t st;
     uint_fast8_t mae;
 
+    /* loop for calling finish() callbacks on objects to be destroyed;
+     * while executing these destructors other objects may be queued up in
+     * this chain of objects to be destroyed */
     fmx = 0;
     while ((dx = w->fdx))
     {
         L("obj_destroy: finishing ox=$xd\n", dx);
-        w->fdx = (oh = w->ohdr[dx])->ndx;
+        w->fdx = ~(oh = w->ohdr[dx])->ndx;
         c = w->ot[oh->class_ox];
         if (c->finish)
         {
-            st = c->finish(w, dx);
+            st = c->finish(w, O70_XTOR(dx));
             if (st) return st;
         }
-        oh->ndx = fmx;
-        fmx = dx;
+        /* queue up the object for deallocation (only if it is not one of the
+         * static objects hardcoded in the world) */
+        if (dx >= O70X__COUNT)
+        {
+            oh->ndx = ~fmx;
+            fmx = dx;
+        }
     }
+    /* free the object bodies - they're just useless shells at this stage */
     for (dx = fmx; dx; dx = fmx)
     {
-        L("obj_destroy: freeing 0x=$xd\n", dx);
+        L("obj_destroy: freeing ox=$xd\n", dx);
         c = w->ot[(oh = w->ohdr[dx])->class_ox];
-        fmx = oh->ndx;
+        fmx = ~oh->ndx;
         mae = c42_ma_free(&w->ma, oh, 1, c->isize);
         if (mae)
         {
@@ -591,7 +632,7 @@ O70_API o70_status_t C42_CALL _o70_obj_destroy (o70_world_t * w)
             return O70S_BUG;
         }
     }
-
+    L("_o70_obj_destroy done\n");
     return 0;
 }
 
@@ -799,6 +840,39 @@ static void C42_CALL prop_bag_init
     c42_rbtree_init(&bag->rbt, prop_key_cmp, NULL);
 }
 
+/* prop_bag_finish **********************************************************/
+static o70_status_t C42_CALL prop_bag_finish
+(
+    o70_world_t * w,
+    o70_prop_bag_t * bag,
+    int deref
+)
+{
+    c42_rbtree_path_t path;
+    c42_rbtree_node_t * rbtn;
+    o70_prop_node_t * n;
+    o70_status_t os;
+    uint_fast8_t mae;
+
+    rbtn = c42_rbtree_first(&path, &bag->rbt);
+    while (rbtn)
+    {
+        n = (o70_prop_node_t *) rbtn;
+        rbtn = c42_rbtree_np(&path, C42_RBTREE_MORE);
+        if (deref)
+        {
+            os = o70_ref_dec(w, n->kv.key);
+            if (os) return os;
+            os = o70_ref_dec(w, n->kv.val);
+            if (os) return os;
+        }
+        mae = C42_MA_VAR_FREE(&w->ma, n);
+        if (mae) return O70S_BUG;
+    }
+    return 0;
+}
+
+
 /* prop_bag_peek ************************************************************/
 static o70_status_t C42_CALL prop_bag_peek
 (
@@ -931,5 +1005,21 @@ O70_API o70_status_t C42_CALL o70_dynobj_raw_put
     osd = o70_ref_dec(w, prop);
     if (osd == O70S_BUG) return O70S_BUG;
     return os ? os : osd;
+}
+
+/* dynobj_finish ************************************************************/
+static o70_status_t C42_CALL dynobj_finish
+(
+    o70_world_t * w,
+    o70_ref_t r
+)
+{
+    o70_dynobj_t * o;
+    o70_status_t os;
+    L("dynobj_finish\n");
+    if (!(o70_model(w, r) & O70M_DYNOBJ)) return O70S_BAD_TYPE;
+    o = w->ot[O70_RTOX(r)];
+    os = prop_bag_finish(w, &o->fields, 1);
+    return os;
 }
 
