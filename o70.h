@@ -791,7 +791,6 @@ C42_INLINE int o70_model
     return o70_class_ptr(w, r)->model;
 }
 
-
 /* o70_flow_create **********************************************************/
 /**
  *  Creates an execution flow.
@@ -936,6 +935,16 @@ O70_API o70_status_t C42_CALL o70_dynobj_raw_put
     o70_ref_t obj,
     o70_ref_t name,
     o70_ref_t value
+);
+
+/* o70_str_create ***********************************************************/
+/**
+ *  Creates an empty string object
+ */
+O70_API o70_status_t C42_CALL o70_str_create
+(
+    o70_world_t * w,
+    o70_ref_t * obj_p
 );
 
 /* }}}1 */

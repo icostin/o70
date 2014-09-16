@@ -619,7 +619,11 @@ O70_API o70_status_t C42_CALL _o70_obj_destroy (o70_world_t * w)
             fmx = dx;
         }
     }
-    /* free the object bodies - they're just useless shells at this stage */
+    /* free the object bodies - they're just useless shells at this stage;
+     * their corpses are kept in the chain so that other objects being destroyed
+     * can do o70_ref_dec() on objects already finished - this situation 
+     * happens only at the end of the world or when garbage collection finds
+     * floating object cycles */
     for (dx = fmx; dx; dx = fmx)
     {
         L("obj_destroy: freeing ox=$xd\n", dx);
@@ -1021,5 +1025,30 @@ static o70_status_t C42_CALL dynobj_finish
     o = w->ot[O70_RTOX(r)];
     os = prop_bag_finish(w, &o->fields, 1);
     return os;
+}
+
+/* o70_str_create ***********************************************************/
+O70_API o70_status_t C42_CALL o70_str_create
+(
+    o70_world_t * w,
+    o70_ref_t * obj_p
+)
+{
+    o70_status_t os;
+    o70_oidx_t ox;
+    o70_str_t * str;
+    os = obj_alloc(w, &ox, O70X_DYNOBJ_CLASS);
+    if (os)
+    {
+        L("o70_str_create: obj_alloc failed: $s = $xd\n",
+          o70_status_name(os), os);
+        return os;
+    }
+    str = w->ot[ox];
+    *obj_p = O70_XTOR(ox);
+    str->data.a = NULL;
+    str->data.n = 0;
+    str->asize = 0;
+    return 0;
 }
 
