@@ -18,6 +18,12 @@
  */
 #define O70CFG_INIT_MOD_NUM 4
 
+/* O70CFG_INIT_STR_SIZE *****************************************************/
+/**
+ *  Initial string alloc size.
+ */
+#define O70CFG_INIT_STR_SIZE 10
+
 /* O70_RTOX *****************************************************************/
 /**
  *  converts an object reference to object index.
@@ -114,7 +120,11 @@ enum o70_statuses
     O70S_BAD_TYPE, /**< an object has the wrong type */
     O70S_NO_MEM, /**< allocation failed */
     O70S_IO_ERROR, /**< I/O error */
+    O70S_BAD_FMT,
+    O70S_BAD_UTF8,
+    O70S_CONV_ERROR,
 
+    O70S_OTHER,
     O70S_BUG = 0x40,
     O70S_TODO,
 };

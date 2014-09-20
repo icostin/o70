@@ -132,6 +132,13 @@ static o70_status_t C42_CALL dynobj_finish
     o70_ref_t o
 );
 
+/* str_finish ***************************************************************/
+static o70_status_t C42_CALL str_finish
+(
+    o70_world_t * w,
+    o70_ref_t r
+);
+
 /* o70_lib_name *************************************************************/
 O70_API uint8_t const * C42_CALL o70_lib_name ()
 {
@@ -355,6 +362,7 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->str_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->str_class.isize = sizeof(o70_str_t);
         w->str_class.model = O70M_STR;
+        w->str_class.finish = str_finish;
 
         w->ohdr[O70X_CTSTR_CLASS] = &w->ctstr_class.ohdr;
         w->ctstr_class.ohdr.nref = 1;
@@ -520,7 +528,7 @@ O70_API o70_status_t C42_CALL o70_world_finish
 
     if (w->mactx.ts)
     {
-        L("*** BUG *** memory leaks: $z bytes in $z blocks.\n", 
+        L("*** BUG *** memory leaks: $z bytes in $z blocks.\n",
           w->mactx.ts, w->mactx.nb);
         rs = O70S_BUG;
     }
@@ -578,7 +586,7 @@ static o70_status_t C42_CALL obj_alloc
     ox = *out;
     cls = w->ot[clox];
     mae = c42_ma_alloc(&w->ma, w->ot + ox, 1, cls->isize);
-    L("obj_alloc: isize=$xz, mae=$i, ox=$xi, r=$xi\n", 
+    L("obj_alloc: isize=$xz, mae=$i, ox=$xi, r=$xi\n",
       cls->isize, mae, ox, O70_XTOR(ox));
     if (mae) { return mae == C42_MA_CORRUPT ? O70S_BUG : O70S_NO_MEM; }
     oh = w->ohdr[ox];
@@ -621,7 +629,7 @@ O70_API o70_status_t C42_CALL _o70_obj_destroy (o70_world_t * w)
     }
     /* free the object bodies - they're just useless shells at this stage;
      * their corpses are kept in the chain so that other objects being destroyed
-     * can do o70_ref_dec() on objects already finished - this situation 
+     * can do o70_ref_dec() on objects already finished - this situation
      * happens only at the end of the world or when garbage collection finds
      * floating object cycles */
     for (dx = fmx; dx; dx = fmx)
@@ -1049,6 +1057,102 @@ O70_API o70_status_t C42_CALL o70_str_create
     str->data.a = NULL;
     str->data.n = 0;
     str->asize = 0;
+    return 0;
+}
+
+struct str_vafmt_writer_s
+{
+    o70_world_t * w;
+    o70_str_t * s;
+};
+
+/* str_vafmt_writer *********************************************************/
+static size_t C42_CALL str_vafmt_writer
+(
+    uint8_t const * data,
+    size_t len,
+    void * ctx
+)
+{
+    struct str_vafmt_writer_s * wctx = ctx;
+    o70_world_t * w = wctx->w;
+    o70_str_t * s = wctx->s;
+    uint_fast8_t mae;
+    size_t alen, nlen;
+    if (s->asize - s->data.n < len)
+    {
+        nlen = s->data.n + len;
+        if (nlen <= len || (ptrdiff_t) nlen < 0) return 0;
+        if (s->asize)
+        {
+            for (alen = s->asize; alen < nlen; alen <<= 1);
+            mae = c42_ma_realloc(&w->ma, (void * *) &s->data.a, 1, 
+                                 s->asize, alen);
+            if (mae) return 0;
+            s->asize = alen;
+        }
+        else
+        {
+            for (alen = O70CFG_INIT_STR_SIZE; alen < nlen; alen <<= 1);
+            mae = C42_MA_ARRAY_ALLOC(&w->ma, s->data.a, alen);
+            if (mae) return 0;
+            s->asize = alen;
+        }
+    }
+    c42_u8a_copy(s->data.a + s->data.n, data, len);
+    s->data.n += len;
+    return len;
+}
+
+/* o70_str_vafmt ************************************************************/
+O70_API o70_status_t C42_CALL o70_str_vafmt
+(
+    o70_world_t * w,
+    o70_ref_t r,
+    char const * fmt,
+    va_list va
+)
+{
+    struct str_vafmt_writer_s wctx;
+    uint_fast8_t fmte;
+
+
+    if (!(o70_model(w, r) & O70M_STR)) return O70S_BAD_TYPE;
+    wctx.w = w;
+    wctx.s = w->ot[O70_RTOX(r)];
+    fmte = c42_write_vfmt(str_vafmt_writer, &wctx, c42_utf8_term_width, NULL, 
+                          fmt, va);
+    switch (fmte)
+    {
+    case C42_FMT_MALFORMED:
+        return O70S_BAD_FMT;
+    case C42_FMT_WIDTH_ERROR:
+        return O70S_BAD_UTF8;
+    case C42_FMT_WRITE_ERROR:
+        return O70S_NO_MEM;
+    case C42_FMT_CONV_ERROR:
+        return O70S_CONV_ERROR;
+    }
+    return O70S_OTHER;
+}
+
+/* str_finish ***************************************************************/
+static o70_status_t C42_CALL str_finish
+(
+    o70_world_t * w,
+    o70_ref_t r
+)
+{
+    o70_str_t * s;
+    L("str_finish\n");
+    if (!(o70_model(w, r) & O70M_STR)) return O70S_BAD_TYPE;
+    s = w->ot[O70_RTOX(r)];
+    if (s->asize)
+    {
+        if (C42_MA_ARRAY_FREE(&w->ma, s->data.a, s->asize))
+            return O70S_BUG;
+    }
+
     return 0;
 }
 
