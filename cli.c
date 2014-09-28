@@ -63,7 +63,7 @@ static uint_fast8_t C42_CALL test0 (c42_svc_t * svc, c42_clia_t * clia)
     os = o70_world_init(&w, &ini);
     if (os)
     {
-        c42_io8_fmt(err, "o70 test1: failed initialising world: $s = $b\n", 
+        c42_io8_fmt(err, "o70 test0: failed initialising world: $s = $b\n", 
                     o70_status_name(os), os);
         return RCINI;
     }
@@ -138,6 +138,7 @@ static uint_fast8_t C42_CALL test0 (c42_svc_t * svc, c42_clia_t * clia)
     {
         c42_io8_fmt(err, "o70 test0: failed finishing world: $s = $b\n",
                     o70_status_name(osf), osf);
+        rc |= RCRUN;
     }
 
     // rc = (os ? RCRUN : 0) | (osf ? RCFIN : 0);
@@ -153,7 +154,7 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
     c42_io8_t * out = &clia->stdio.out;
     c42_io8_t * err = &clia->stdio.err;
     o70_status_t os, osf;
-    o70_ref_t obj, afi, bfi, cfi, v;
+    o70_ref_t obj, obk, afi, bfi, cfi, v;
     uint_fast8_t rc = 0, ok = 0;
 
     C42_VAR_CLEAR(ini);
@@ -172,7 +173,7 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
         ZOB(os = o70_dynobj_create(&w, &obj));
         ZOB(os = O70_CTSTR(&w, &afi, "a_field"));
         ZOB(os = o70_dynobj_raw_put(&w, obj, afi, O70R_NULL));
-        ZOB(os = o70_dynobj_raw_put(&w, obj, afi, O70R_FASTINT(1)));
+        ZOB(os = o70_dynobj_raw_put(&w, obj, afi, O70_FITOR(1)));
         ZOB(os = O70_CTSTR(&w, &bfi, "bfi"));
         ZOB(os = o70_dynobj_raw_put(&w, obj, bfi, O70R_TRUE));
         ZOB(os = O70_CTSTR(&w, &cfi, "cfld"));
@@ -182,17 +183,27 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
         ZOB(os = o70_dynobj_raw_get(&w, obj, bfi, &v));
         TOB(v == O70R_TRUE);
         ZOB(os = o70_dynobj_raw_get(&w, obj, afi, &v));
-        TOB(v == O70R_FASTINT(1));
+        TOB(v == O70_FITOR(1));
         TOB(w.ohdr[O70_RTOX(obj)]->nref == 1);
+        ZOB(os = o70_obj_short_desc(&w, obj, &obk));
+        ZOB(c42_io8_fmt(out, "o70 test1: obj desc: \"$.*s\"\n", 
+                        o70_str_len(&w, obk), o70_str_data(&w, obk)));
         ZOB(os = o70_ref_dec(&w, obj));
         TOB(w.ffx = O70_RTOX(obj));
+        ZOB(os = o70_str_create(&w, &obj));
+        ZOB(os = o70_str_afmt(&w, obj, "I'm s$Xd.", obj));
+        ZOB(c42_io8_fmt(out, "o70 test1: str fmt: $.*s (len: $z)\n", 
+                        o70_str_len(&w, obj), o70_str_data(&w, obj), 
+                        o70_str_len(&w, obj)));
+        
         ok = 1;
     }
     while (0);
     if (os == O70S_BUG) return RCBUG;
     if (!ok) 
     {
-        c42_io8_fmt(err, "o70 test1: last error $s = $b\n", o70_status_name(os), os);
+        c42_io8_fmt(err, "o70 test1: last error $s = $b\n",
+                    o70_status_name(os), os);
         rc |= RCRUN;
     }
     osf = o70_world_finish(&w);
@@ -229,35 +240,6 @@ static uint_fast8_t C42_CALL run_test (c42_svc_t * svc, c42_clia_t * clia)
             rc |= RCOUT;
         if (rc) break;
     }
-
-
-    // C42_VAR_CLEAR(ini);
-    // ini.ma = &svc->ma;
-    // ini.out = out;
-    // ini.err = err;
-    // e = o70_world_init(&w, &ini);
-    // if (e)
-    // {
-    //     c42_io8_fmt(err, "o70 test: failed initialising world: $s = $b\n", 
-    //                 o70_status_name(e), e);
-    //     return 1;
-    // }
-
-    // do
-    // {
-    //     r = test0(svc, clia);
-    //     if (r) c42_io8_fmt(err, "o70 test: test #1 failed\n");
-    //     r = test1(svc, clia);
-    //     if (r) c42_io8_fmt(err, "o70 test: test #2 failed\n");
-    // }
-    // while (0);
-
-    // e = o70_world_finish(&w);
-    // if (e)
-    // {
-    //     c42_io8_fmt(err, "o70 test: failed finishing world: $b\n", e);
-    //     r |= 1;
-    // }
 
     return rc;
 }

@@ -47,11 +47,17 @@
  */
 #define O70_IS_FASTINT(_ref) ((_ref) & 1)
 
-/* O70R_FASTINT *************************************************************/
+/* O70_FITOR ****************************************************************/
 /**
  *  Converts an int value to a fastint reference.
  */
-#define O70R_FASTINT(_value) (((_value) << 1) | 1)
+#define O70_FITOR(_value) (((_value) << 1) | 1)
+
+/* O70_RTOFI ****************************************************************/
+/**
+ *  ref to fastint
+ */
+#define O70_RTOFI(_r) ((int32_t) (_r) >> 1)
 
 /* Object model constants */
 #define O70M_DYNOBJ     (1 << 0) /**< regular object (with a property bag) */
@@ -955,6 +961,79 @@ O70_API o70_status_t C42_CALL o70_str_create
 (
     o70_world_t * w,
     o70_ref_t * obj_p
+);
+
+/* o70_str_vafmt ************************************************************/
+/**
+ *  Appends a formatted string.
+ *  See c42_write_vfmt() in c42 library for formatting rules.
+ */
+O70_API o70_status_t C42_CALL o70_str_vafmt
+(
+    o70_world_t * w,
+    o70_ref_t r,
+    char const * fmt,
+    va_list va
+);
+
+/* o70_str_afmt *************************************************************/
+/**
+ *  Appends a formatted string.
+ *  See c42_write_vfmt() in c42 library for formatting rules.
+ */
+O70_API o70_status_t C42_CALL o70_str_afmt
+(
+    o70_world_t * w,
+    o70_ref_t r,
+    char const * fmt,
+    ...
+);
+
+/* o70_str_len **************************************************************/
+/**
+ *  Convenience function that returns string length.
+ *
+ */
+O70_API size_t C42_CALL o70_str_len
+(
+    o70_world_t * w,
+    o70_ref_t r
+);
+
+/* o70_str_data *************************************************************/
+/**
+ *  Convenience function that returns a pointer to string data (or NULL if
+ *  not a string or empty string).
+ */
+O70_API uint8_t * C42_CALL o70_str_data
+(
+    o70_world_t * w,
+    o70_ref_t r
+);
+
+/* o70_str_append_obj_short_desc ********************************************/
+/**
+ *  Append short description.
+ *  @param w world
+ *  @param str string object where description should be appended to
+ *  @param obj object to be described
+ */
+O70_API o70_status_t C42_CALL o70_str_append_obj_short_desc
+(
+    o70_world_t * w,
+    o70_ref_t str,
+    o70_ref_t obj
+);
+
+/* o70_obj_short_desc *******************************************************/
+/**
+ *  Generates a string with a short description for the given object.
+ */
+O70_API o70_status_t C42_CALL o70_obj_short_desc
+(
+    o70_world_t * w,
+    o70_ref_t obj,
+    o70_ref_t * out
 );
 
 /* }}}1 */

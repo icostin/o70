@@ -40,6 +40,16 @@ static o70_status_t C42_CALL ics_node_create
     o70_ref_t ctstr
 );
 
+/* ics_node_delete **********************************************************/
+/**
+ *  Deletes a node from ics tree.
+ */
+static o70_status_t C42_CALL ics_node_delete
+(
+    o70_world_t * w,
+    o70_ref_t ctstr
+);
+
 /* ox_alloc *****************************************************************/
 /**
  *  Object index alloc.
@@ -71,6 +81,7 @@ static void C42_CALL prop_bag_init
     o70_prop_bag_t * bag
 );
 
+/* prop_bag_finish **********************************************************/
 static o70_status_t C42_CALL prop_bag_finish
 (
     o70_world_t * w,
@@ -134,6 +145,13 @@ static o70_status_t C42_CALL dynobj_finish
 
 /* str_finish ***************************************************************/
 static o70_status_t C42_CALL str_finish
+(
+    o70_world_t * w,
+    o70_ref_t r
+);
+
+/* ictstr_finish ************************************************************/
+static o70_status_t C42_CALL ictstr_finish
 (
     o70_world_t * w,
     o70_ref_t r
@@ -243,6 +261,41 @@ static o70_status_t C42_CALL ics_node_create
     node->kv.val = node->kv.key = ctstr;
     c42_rbtree_insert(path, &node->rbtn);
     o70_ref_inc(w, ctstr);
+    return 0;
+}
+
+/* ics_node_delete **********************************************************/
+static o70_status_t C42_CALL ics_node_delete
+(
+    o70_world_t * w,
+    o70_ref_t r
+)
+{
+    c42_rbtree_path_t path;
+    o70_ctstr_t * cs;
+    o70_prop_node_t * n;
+
+    uint_fast8_t rbte;
+    uint_fast8_t mae;
+    if (!(o70_model(w, r) & O70M_ICTSTR)) return O70S_BAD_TYPE;
+    cs = w->ot[O70_RTOX(r)];
+    rbte = c42_rbtree_find(&path, &w->ics.rbt, (uintptr_t) &cs->data);
+    if (rbte != C42_RBTREE_FOUND) return O70S_MISSING;
+#if _DEBUG > 2
+    {
+        unsigned int i;
+        L("ics_node_delete: path ($d):", path.last + 1);
+        for (i = 0; i <= path.last; ++i)
+        {
+            L(" $xp ($c)", path.nodes[i], path.sides[i] ? (path.sides[i] == 1 ? 'r' : 'e') : 'l');
+        }
+        L(".\n");
+    }
+#endif
+    n = (o70_prop_node_t *) path.nodes[path.last];
+    c42_rbtree_delete(&path);
+    mae = C42_MA_VAR_FREE(&w->ma, n);
+    if (mae) return O70S_BUG;
     return 0;
 }
 
@@ -381,6 +434,7 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->ictstr_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->ictstr_class.isize = sizeof(o70_ctstr_t);
         w->ictstr_class.model = O70M_SCTSTR | O70M_ICTSTR;
+        w->ictstr_class.finish = ictstr_finish;
 
         w->ohdr[O70X_IACTSTR_CLASS] = &w->iactstr_class.ohdr;
         w->iactstr_class.ohdr.nref = 1;
@@ -508,11 +562,23 @@ O70_API o70_status_t C42_CALL o70_world_finish
     L("o70_world_finish: starting\n");
     if (w->om)
     {
+        /* clear chain of free obj slots */
         for (i = w->ffx; i < w->on; i = j)
         {
             j = w->nfx[i];
             w->nfx[i] = 0;
         }
+        /* all non-NULL entries now are used objects so we can chain them in the
+         * destroy list */
+        w->fdx = 0;
+        for (i = 0; i < w->on; ++i)
+            if (w->ot[i])
+            {
+                w->ohdr[i]->ndx = ~w->fdx;
+                w->fdx = i;
+            }
+        rs = _o70_obj_destroy(w);
+        if (rs) return rs;
 
         mae = C42_MA_ARRAY_FREE(&w->ma, w->ohdr, w->om);
         if (mae) return O70S_BUG;
@@ -611,22 +677,37 @@ O70_API o70_status_t C42_CALL _o70_obj_destroy (o70_world_t * w)
     fmx = 0;
     while ((dx = w->fdx))
     {
-        L("obj_destroy: finishing ox=$xd\n", dx);
+        //L("obj_destroy: finishing ox=$xd\n", dx);
         w->fdx = ~(oh = w->ohdr[dx])->ndx;
+        //L("dx=$xd, oh: $xp; count: $xd\n", dx, oh, O70X__COUNT);
+        //L("oh->class_ox: $xd\n", oh->class_ox);
         c = w->ot[oh->class_ox];
+        //L("c: $xp\n", c);
         if (c->finish)
         {
+            //L("calling finish...\n");
             st = c->finish(w, O70_XTOR(dx));
-            if (st) return st;
+            if (st)
+            {
+                // L("obj_destroy: r$Xd.finish = $s = $b\n",
+                //   O70_XTOR(dx), o70_status_name(st), st);
+                return st;
+            }
         }
         /* queue up the object for deallocation (only if it is not one of the
          * static objects hardcoded in the world) */
         if (dx >= O70X__COUNT)
         {
+            // L("queuing up for freeing\n");
             oh->ndx = ~fmx;
             fmx = dx;
         }
+        else
+        {
+            //L("no queuing\n"); 
+        }
     }
+    //L("---\n");
     /* free the object bodies - they're just useless shells at this stage;
      * their corpses are kept in the chain so that other objects being destroyed
      * can do o70_ref_dec() on objects already finished - this situation
@@ -634,17 +715,19 @@ O70_API o70_status_t C42_CALL _o70_obj_destroy (o70_world_t * w)
      * floating object cycles */
     for (dx = fmx; dx; dx = fmx)
     {
-        L("obj_destroy: freeing ox=$xd\n", dx);
+        //L("obj_destroy: freeing ox=$xd\n", dx);
         c = w->ot[(oh = w->ohdr[dx])->class_ox];
+        w->nfx[dx] = w->ffx;
+        w->ffx = dx;
         fmx = ~oh->ndx;
         mae = c42_ma_free(&w->ma, oh, 1, c->isize);
         if (mae)
         {
-            L("obj_destroy: ma_free error $b\n", mae);
+            //L("obj_destroy: ma_free error $b\n", mae);
             return O70S_BUG;
         }
     }
-    L("_o70_obj_destroy done\n");
+    //L("_o70_obj_destroy done\n");
     return 0;
 }
 
@@ -1028,12 +1111,34 @@ static o70_status_t C42_CALL dynobj_finish
 {
     o70_dynobj_t * o;
     o70_status_t os;
-    L("dynobj_finish\n");
-    if (!(o70_model(w, r) & O70M_DYNOBJ)) return O70S_BAD_TYPE;
+    //L("dynobj_finish\n");
+    if (!(o70_model(w, r) & O70M_DYNOBJ)) return O70S_BUG;
     o = w->ot[O70_RTOX(r)];
     os = prop_bag_finish(w, &o->fields, 1);
     return os;
 }
+
+/* ictstr_finish ************************************************************/
+static o70_status_t C42_CALL ictstr_finish
+(
+    o70_world_t * w,
+    o70_ref_t r
+)
+{
+    o70_status_t os;
+    //L("ictstr_finish: ref=$xd\n", r);
+    if (!(o70_model(w, r) & O70M_ICTSTR)) return O70S_BUG;
+    os = ics_node_delete(w, r);
+    if (os)
+    {
+        L("*** BUG *** ictstr_finish: ics_node_delete(ref=$xd) = $s = $b\n",
+          r, o70_status_name(os), os);
+        return O70S_BUG;
+    }
+    //L("ictstr_finish: ref=$xd -> done\n", r);
+    return 0;
+}
+
 
 /* o70_str_create ***********************************************************/
 O70_API o70_status_t C42_CALL o70_str_create
@@ -1045,7 +1150,7 @@ O70_API o70_status_t C42_CALL o70_str_create
     o70_status_t os;
     o70_oidx_t ox;
     o70_str_t * str;
-    os = obj_alloc(w, &ox, O70X_DYNOBJ_CLASS);
+    os = obj_alloc(w, &ox, O70X_STR_CLASS);
     if (os)
     {
         L("o70_str_create: obj_alloc failed: $s = $xd\n",
@@ -1079,14 +1184,16 @@ static size_t C42_CALL str_vafmt_writer
     o70_str_t * s = wctx->s;
     uint_fast8_t mae;
     size_t alen, nlen;
+
+L("vafmt_writer: len=$xz\n", len);
     if (s->asize - s->data.n < len)
     {
         nlen = s->data.n + len;
-        if (nlen <= len || (ptrdiff_t) nlen < 0) return 0;
+        if (nlen < len || (ptrdiff_t) nlen < 0) return 0;
         if (s->asize)
         {
             for (alen = s->asize; alen < nlen; alen <<= 1);
-            mae = c42_ma_realloc(&w->ma, (void * *) &s->data.a, 1, 
+            mae = c42_ma_realloc(&w->ma, (void * *) &s->data.a, 1,
                                  s->asize, alen);
             if (mae) return 0;
             s->asize = alen;
@@ -1094,6 +1201,7 @@ static size_t C42_CALL str_vafmt_writer
         else
         {
             for (alen = O70CFG_INIT_STR_SIZE; alen < nlen; alen <<= 1);
+            L("vafmt_writer: alen=$xz\n", alen);
             mae = C42_MA_ARRAY_ALLOC(&w->ma, s->data.a, alen);
             if (mae) return 0;
             s->asize = alen;
@@ -1116,14 +1224,16 @@ O70_API o70_status_t C42_CALL o70_str_vafmt
     struct str_vafmt_writer_s wctx;
     uint_fast8_t fmte;
 
-
     if (!(o70_model(w, r) & O70M_STR)) return O70S_BAD_TYPE;
     wctx.w = w;
     wctx.s = w->ot[O70_RTOX(r)];
-    fmte = c42_write_vfmt(str_vafmt_writer, &wctx, c42_utf8_term_width, NULL, 
+    fmte = c42_write_vfmt(str_vafmt_writer, &wctx, c42_utf8_term_width, NULL,
                           fmt, va);
+    L("o70_str_vafmt: fmte=$b, s.len=$z\n", fmte, wctx.s->data.n);
     switch (fmte)
     {
+    case 0:
+        return 0;
     case C42_FMT_MALFORMED:
         return O70S_BAD_FMT;
     case C42_FMT_WIDTH_ERROR:
@@ -1136,6 +1246,24 @@ O70_API o70_status_t C42_CALL o70_str_vafmt
     return O70S_OTHER;
 }
 
+/* o70_str_afmt *************************************************************/
+O70_API o70_status_t C42_CALL o70_str_afmt
+(
+    o70_world_t * w,
+    o70_ref_t r,
+    char const * fmt,
+    ...
+)
+{
+    va_list va;
+    o70_status_t os;
+
+    va_start(va, fmt);
+    os = o70_str_vafmt(w, r, fmt, va);
+    va_end(va);
+    return os;
+}
+
 /* str_finish ***************************************************************/
 static o70_status_t C42_CALL str_finish
 (
@@ -1144,8 +1272,8 @@ static o70_status_t C42_CALL str_finish
 )
 {
     o70_str_t * s;
-    L("str_finish\n");
-    if (!(o70_model(w, r) & O70M_STR)) return O70S_BAD_TYPE;
+    //L("str_finish\n");
+    if (!(o70_model(w, r) & O70M_STR)) return O70S_BUG;
     s = w->ot[O70_RTOX(r)];
     if (s->asize)
     {
@@ -1154,5 +1282,73 @@ static o70_status_t C42_CALL str_finish
     }
 
     return 0;
+}
+
+/* o70_str_len **************************************************************/
+O70_API size_t C42_CALL o70_str_len
+(
+    o70_world_t * w,
+    o70_ref_t r
+)
+{
+    o70_str_t * s;
+    if (!(o70_model(w, r) & O70M_STR)) return O70S_BAD_TYPE;
+    s = w->ot[O70_RTOX(r)];
+    return s->data.n;
+}
+
+/* o70_str_data *************************************************************/
+O70_API uint8_t * C42_CALL o70_str_data
+(
+    o70_world_t * w,
+    o70_ref_t r
+)
+{
+    o70_str_t * s;
+    if (!(o70_model(w, r) & O70M_STR)) return NULL;
+    s = w->ot[O70_RTOX(r)];
+    return s->data.a;
+}
+
+/* o70_str_asd **************************************************************/
+O70_API o70_status_t C42_CALL o70_str_append_obj_short_desc
+(
+    o70_world_t * w,
+    o70_ref_t str,
+    o70_ref_t obj
+)
+{
+    o70_status_t os;
+    if (O70_IS_FASTINT(obj))
+    {
+        os = o70_str_afmt(w, str, "$D", O70_RTOFI(obj));
+    }
+    else
+    {
+        os = o70_str_afmt(w, str, "r$d", obj);
+    }
+    return os;
+}
+
+/* o70_short_desc ***********************************************************/
+O70_API o70_status_t C42_CALL o70_obj_short_desc
+(
+    o70_world_t * w,
+    o70_ref_t obj,
+    o70_ref_t * out
+)
+{
+    o70_status_t os;
+    os = o70_str_create(w, out);
+    if (!os) 
+    {
+        os = o70_str_append_obj_short_desc(w, *out, obj);
+        if (os && os != O70S_BUG)
+        {
+            o70_status_t rdos = o70_ref_dec(w, *out);
+            if (rdos) return O70S_BUG;
+        }
+    }
+    return os;
 }
 
