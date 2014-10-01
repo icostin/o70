@@ -195,7 +195,7 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
         ZOB(c42_io8_fmt(out, "o70 test1: str fmt: $.*s (len: $z)\n", 
                         o70_str_len(&w, obj), o70_str_data(&w, obj), 
                         o70_str_len(&w, obj)));
-        
+        ZOB(os = o70_dump_object_map(&w, w.out));
         ok = 1;
     }
     while (0);

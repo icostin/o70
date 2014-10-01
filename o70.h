@@ -71,6 +71,8 @@
 #define O70M_EXCEPTION  (1 << 8) 
 #define O70M_MODULE     (1 << 9)
 
+#define O70M_ANY_CTSTR  (O70M_SCTSTR | O70M_ACTSTR | O70M_ICTSTR)
+
 /* hardcoded refs */
 #define O70R_NULL       (O70_XTOR(O70X_NULL))
 #define O70R_FALSE      (O70_XTOR(O70X_FALSE))
@@ -492,6 +494,7 @@ struct o70_class_s
 
     uint32_t model; /**< bitmask for primitive types compatible with instances
                          of this class */
+    o70_ref_t name; /**< class name - for information purposes */
     size_t isize; /**< size in bytes of instances */
     // size_t class_size; /**< size in bytes of the class object */
 };
@@ -807,6 +810,20 @@ C42_INLINE int o70_model
     return o70_class_ptr(w, r)->model;
 }
 
+/* o70_obj_class_name *******************************************************/
+/**
+ *  Returns the reference to the ctstr specified as the name of this object's
+ *  class.
+ */
+C42_INLINE o70_ref_t o70_obj_class_name
+(
+    o70_world_t * w,
+    o70_ref_t obj
+)
+{
+    return o70_class_ptr(w, obj)->name;
+}
+
 /* o70_flow_create **********************************************************/
 /**
  *  Creates an execution flow.
@@ -1034,6 +1051,16 @@ O70_API o70_status_t C42_CALL o70_obj_short_desc
     o70_world_t * w,
     o70_ref_t obj,
     o70_ref_t * out
+);
+
+/* o70_dump_object_map ******************************************************/
+/**
+ *  Outputs a list of all object in the given world.
+ */
+O70_API o70_status_t C42_CALL o70_dump_object_map
+(
+    o70_world_t * w,
+    c42_io8_t * io
 );
 
 /* }}}1 */

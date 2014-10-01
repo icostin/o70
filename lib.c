@@ -345,7 +345,7 @@ O70_API o70_status_t C42_CALL o70_world_init
         if (mae) { r = mae == C42_MA_CORRUPT ? O70S_BUG : O70S_NO_MEM; break; }
         w->on = O70X__COUNT;
         w->ffx = 0;
-        c42_upa_set(w->nfx + w->on, 0, w->om - w->on); /* CRASH */
+        c42_upa_set(w->nfx + w->on, 0, w->om - w->on);
 
         w->mn = 0;
         w->mm = O70CFG_INIT_MOD_NUM;
@@ -372,18 +372,21 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->null_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->null_class.isize = sizeof(o70_object_t);
         w->null_class.model = 0;
+        w->null_class.name = O70_XTOR(O70X_NULL_ICTSTR);
 
         w->ohdr[O70X_BOOL_CLASS] = &w->bool_class.ohdr;
         w->bool_class.ohdr.nref = 1;
         w->bool_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->bool_class.isize = sizeof(o70_object_t);
         w->bool_class.model = 0;
+        w->bool_class.name = O70_XTOR(O70X_BOOL_ICTSTR);
 
         w->ohdr[O70X_INT_CLASS] = &w->int_class.ohdr;
         w->int_class.ohdr.nref = 1;
         w->int_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->int_class.isize = sizeof(o70_object_t);
         w->int_class.model = 0;
+        w->int_class.name = O70_XTOR(O70X_CLASS_ICTSTR);
 
         w->ohdr[O70X_DYNOBJ_CLASS] = &w->dynobj_class.ohdr;
         w->dynobj_class.ohdr.class_ox = O70X_CLASS_CLASS;
@@ -391,24 +394,28 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->dynobj_class.isize = sizeof(o70_dynobj_t);
         w->dynobj_class.model = O70M_DYNOBJ;
         w->dynobj_class.finish = dynobj_finish;
+        w->dynobj_class.name = O70_XTOR(O70X_DYNOBJ_ICTSTR);
 
         w->ohdr[O70X_CLASS_CLASS] = &w->class_class.ohdr;
-        w->class_class.ohdr.nref = 1;
         w->class_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->class_class.ohdr.nref = 1;
         w->class_class.isize = sizeof(o70_class_t);
         w->class_class.model = O70M_DYNOBJ | O70M_CLASS;
+        w->class_class.name = O70_XTOR(O70X_CLASS_ICTSTR);
 
         w->ohdr[O70X_ARRAY_CLASS] = &w->array_class.ohdr;
         w->array_class.ohdr.nref = 1;
         w->array_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->array_class.isize = sizeof(o70_array_t);
         w->array_class.model = O70M_ARRAY;
+        w->array_class.name = O70_XTOR(O70X_ARRAY_ICTSTR);
 
         w->ohdr[O70X_FUNCTION_CLASS] = &w->function_class.ohdr;
         w->function_class.ohdr.nref = 1;
         w->function_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->function_class.isize = sizeof(o70_function_t);
         w->function_class.model = O70M_FUNCTION;
+        w->function_class.name = O70_XTOR(O70X_FUNCTION_ICTSTR);
 
         w->ohdr[O70X_STR_CLASS] = &w->str_class.ohdr;
         w->str_class.ohdr.nref = 1;
@@ -416,18 +423,21 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->str_class.isize = sizeof(o70_str_t);
         w->str_class.model = O70M_STR;
         w->str_class.finish = str_finish;
+        w->str_class.name = O70_XTOR(O70X_STR_ICTSTR);
 
         w->ohdr[O70X_CTSTR_CLASS] = &w->ctstr_class.ohdr;
         w->ctstr_class.ohdr.nref = 1;
         w->ctstr_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->ctstr_class.isize = sizeof(o70_ctstr_t);
         w->ctstr_class.model = O70M_SCTSTR;
+        w->ctstr_class.name = O70_XTOR(O70X_CTSTR_ICTSTR);
 
         w->ohdr[O70X_ACTSTR_CLASS] = &w->actstr_class.ohdr;
         w->actstr_class.ohdr.nref = 1;
         w->actstr_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->actstr_class.isize = sizeof(o70_ctstr_t);
         w->actstr_class.model = O70M_ACTSTR;
+        w->actstr_class.name = O70_XTOR(O70X_ACTSTR_ICTSTR);
 
         w->ohdr[O70X_ICTSTR_CLASS] = &w->ictstr_class.ohdr;
         w->ictstr_class.ohdr.nref = 1;
@@ -435,24 +445,28 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->ictstr_class.isize = sizeof(o70_ctstr_t);
         w->ictstr_class.model = O70M_SCTSTR | O70M_ICTSTR;
         w->ictstr_class.finish = ictstr_finish;
+        w->ictstr_class.name = O70_XTOR(O70X_ICTSTR_ICTSTR);
 
         w->ohdr[O70X_IACTSTR_CLASS] = &w->iactstr_class.ohdr;
         w->iactstr_class.ohdr.nref = 1;
         w->iactstr_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->iactstr_class.isize = sizeof(o70_ctstr_t);
         w->iactstr_class.model = O70M_ACTSTR | O70M_ICTSTR;
+        w->iactstr_class.name = O70_XTOR(O70X_IACTSTR_ICTSTR);
 
         w->ohdr[O70X_EXCEPTION_CLASS] = &w->exception_class.ohdr;
         w->exception_class.ohdr.nref = 1;
         w->exception_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->exception_class.isize = sizeof(o70_exception_t);
         w->exception_class.model = O70M_EXCEPTION;
+        w->exception_class.name = O70_XTOR(O70X_EXCEPTION_ICTSTR);
 
         w->ohdr[O70X_MODULE_CLASS] = &w->module_class.ohdr;
         w->module_class.ohdr.nref = 1;
         w->module_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->module_class.isize = sizeof(o70_module_t);
         w->module_class.model = O70M_MODULE;
+        w->module_class.name = O70_XTOR(O70X_MODULE_ICTSTR);
 
         w->ohdr[O70X_NULL_ICTSTR] = &w->null_ictstr.ohdr;
         w->null_ictstr.ohdr.nref = 1;
@@ -557,22 +571,24 @@ O70_API o70_status_t C42_CALL o70_world_finish
 {
     uint_fast8_t mae;
     o70_status_t rs = 0;
-    size_t i, j;
+    size_t i;//, j;
 
     L("o70_world_finish: starting\n");
     if (w->om)
     {
+#if 0
         /* clear chain of free obj slots */
         for (i = w->ffx; i < w->on; i = j)
         {
-            j = w->nfx[i];
+            j = w->nfx[i] >> 1;
             w->nfx[i] = 0;
         }
         /* all non-NULL entries now are used objects so we can chain them in the
          * destroy list */
+#endif
         w->fdx = 0;
         for (i = 0; i < w->on; ++i)
-            if (w->ot[i])
+            if (!(w->nfx[i] & 1)) // (w->ot[i])
             {
                 w->ohdr[i]->ndx = ~w->fdx;
                 w->fdx = i;
@@ -614,7 +630,7 @@ static o70_status_t C42_CALL ox_alloc
     /* if there's a free index in the chain, return it and update the head */
     if (w->ffx)
     {
-        w->ffx = w->nfx[*ox = w->ffx];
+        w->ffx = w->nfx[*ox = w->ffx] >> 1;
         return 0;
     }
     /* if all object entries are used then double the table */
@@ -717,7 +733,7 @@ O70_API o70_status_t C42_CALL _o70_obj_destroy (o70_world_t * w)
     {
         //L("obj_destroy: freeing ox=$xd\n", dx);
         c = w->ot[(oh = w->ohdr[dx])->class_ox];
-        w->nfx[dx] = w->ffx;
+        w->nfx[dx] = (w->ffx << 1) | 1;
         w->ffx = dx;
         fmx = ~oh->ndx;
         mae = c42_ma_free(&w->ma, oh, 1, c->isize);
@@ -1310,6 +1326,32 @@ O70_API uint8_t * C42_CALL o70_str_data
     return s->data.a;
 }
 
+/* o70_str_len **************************************************************/
+O70_API size_t C42_CALL o70_ctstr_len
+(
+    o70_world_t * w,
+    o70_ref_t r
+)
+{
+    o70_str_t * s;
+    if (!(o70_model(w, r) & O70M_ANY_CTSTR)) return O70S_BAD_TYPE;
+    s = w->ot[O70_RTOX(r)];
+    return s->data.n;
+}
+
+/* o70_str_data *************************************************************/
+O70_API uint8_t * C42_CALL o70_ctstr_data
+(
+    o70_world_t * w,
+    o70_ref_t r
+)
+{
+    o70_str_t * s;
+    if (!(o70_model(w, r) & O70M_ANY_CTSTR)) return NULL;
+    s = w->ot[O70_RTOX(r)];
+    return s->data.a;
+}
+
 /* o70_str_asd **************************************************************/
 O70_API o70_status_t C42_CALL o70_str_append_obj_short_desc
 (
@@ -1350,5 +1392,30 @@ O70_API o70_status_t C42_CALL o70_obj_short_desc
         }
     }
     return os;
+}
+
+/* o70_dump_object_map ******************************************************/
+O70_API o70_status_t C42_CALL o70_dump_object_map
+(
+    o70_world_t * w,
+    c42_io8_t * io
+)
+{
+    o70_oidx_t i;
+    if (c42_io8_fmt(io, "object map [world $xp]:\n", w))
+        return O70S_IO_ERROR;
+    for (i = 0; i < w->on; ++i)
+    {
+        o70_ref_t class_name;
+        if ((w->nfx[i] & 1)) continue;
+        class_name = o70_obj_class_name(w, O70_XTOR(i));
+        if (c42_io8_fmt(io, "- $.*s:$04Xd\n", 
+                        o70_ctstr_len(w, class_name), o70_ctstr_data(w, class_name),
+                        O70_XTOR(i)))
+            return O70S_IO_ERROR;
+    }
+    if (c42_io8_fmt(io, "end object map [world $xp]:\n", w)) 
+        return O70S_IO_ERROR;
+    return 0;
 }
 
