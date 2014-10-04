@@ -1155,6 +1155,31 @@ static o70_status_t C42_CALL ictstr_finish
     return 0;
 }
 
+/* o70_ctstr_len ************************************************************/
+O70_API size_t C42_CALL o70_ctstr_len
+(
+    o70_world_t * w,
+    o70_ref_t r
+)
+{
+    o70_str_t * s;
+    if (!(o70_model(w, r) & O70M_ANY_CTSTR)) return 0;
+    s = w->ot[O70_RTOX(r)];
+    return s->data.n;
+}
+
+/* o70_ctstr_data ***********************************************************/
+O70_API uint8_t * C42_CALL o70_ctstr_data
+(
+    o70_world_t * w,
+    o70_ref_t r
+)
+{
+    o70_str_t * s;
+    if (!(o70_model(w, r) & O70M_ANY_CTSTR)) return NULL;
+    s = w->ot[O70_RTOX(r)];
+    return s->data.a;
+}
 
 /* o70_str_create ***********************************************************/
 O70_API o70_status_t C42_CALL o70_str_create
@@ -1308,7 +1333,7 @@ O70_API size_t C42_CALL o70_str_len
 )
 {
     o70_str_t * s;
-    if (!(o70_model(w, r) & O70M_STR)) return O70S_BAD_TYPE;
+    if (!(o70_model(w, r) & O70M_STR)) return 0;
     s = w->ot[O70_RTOX(r)];
     return s->data.n;
 }
@@ -1322,32 +1347,6 @@ O70_API uint8_t * C42_CALL o70_str_data
 {
     o70_str_t * s;
     if (!(o70_model(w, r) & O70M_STR)) return NULL;
-    s = w->ot[O70_RTOX(r)];
-    return s->data.a;
-}
-
-/* o70_str_len **************************************************************/
-O70_API size_t C42_CALL o70_ctstr_len
-(
-    o70_world_t * w,
-    o70_ref_t r
-)
-{
-    o70_str_t * s;
-    if (!(o70_model(w, r) & O70M_ANY_CTSTR)) return O70S_BAD_TYPE;
-    s = w->ot[O70_RTOX(r)];
-    return s->data.n;
-}
-
-/* o70_str_data *************************************************************/
-O70_API uint8_t * C42_CALL o70_ctstr_data
-(
-    o70_world_t * w,
-    o70_ref_t r
-)
-{
-    o70_str_t * s;
-    if (!(o70_model(w, r) & O70M_ANY_CTSTR)) return NULL;
     s = w->ot[O70_RTOX(r)];
     return s->data.a;
 }
@@ -1406,15 +1405,42 @@ O70_API o70_status_t C42_CALL o70_dump_object_map
         return O70S_IO_ERROR;
     for (i = 0; i < w->on; ++i)
     {
-        o70_ref_t class_name;
+        o70_ref_t oref, class_name;
+        int model;
         if ((w->nfx[i] & 1)) continue;
-        class_name = o70_obj_class_name(w, O70_XTOR(i));
-        if (c42_io8_fmt(io, "- $.*s:$04Xd\n", 
-                        o70_ctstr_len(w, class_name), o70_ctstr_data(w, class_name),
-                        O70_XTOR(i)))
+        oref = O70_XTOR(i);
+        class_name = o70_obj_class_name(w, oref);
+        if (c42_io8_fmt(io, "- <$.*s:$04Xd rc=$d", 
+                        o70_ctstr_len(w, class_name), 
+                        o70_ctstr_data(w, class_name),
+                        O70_XTOR(i), w->ohdr[i]->nref))
             return O70S_IO_ERROR;
+        model = o70_model(w, oref);
+        if ((model & O70M_ANY_CTSTR))
+        {
+            if (c42_io8_fmt(io, " data=\"$.*es\"", o70_ctstr_len(w, oref),
+                            o70_ctstr_data(w, oref)))
+                return O70S_IO_ERROR;
+        }
+        else if ((model & O70M_STR))
+        {
+            o70_str_t * s = w->ot[i];
+            if (c42_io8_fmt(io, " data=\"$.*es\" asize=$xz", 
+                            s->data.n, s->data.a, s->asize))
+                return O70S_IO_ERROR;
+        }
+        else if ((model & O70M_CLASS))
+        {
+            o70_class_t * c = w->ot[i];
+            if (c42_io8_fmt(io, " name=\"$.*es\"",
+                            o70_ctstr_len(w, c->name),
+                            o70_ctstr_data(w, c->name)))
+                return O70S_IO_ERROR;
+        }
+
+        if (c42_io8_fmt(io, "/>\n")) return O70S_IO_ERROR;
     }
-    if (c42_io8_fmt(io, "end object map [world $xp]:\n", w)) 
+    if (c42_io8_fmt(io, "end object map [world $xp]\n", w)) 
         return O70S_IO_ERROR;
     return 0;
 }

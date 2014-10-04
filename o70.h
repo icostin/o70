@@ -970,6 +970,28 @@ O70_API o70_status_t C42_CALL o70_dynobj_raw_put
     o70_ref_t value
 );
 
+/* o70_ctstr_len ************************************************************/
+/**
+ *  Convenience function that returns string length.
+ *
+ */
+O70_API size_t C42_CALL o70_ctstr_len
+(
+    o70_world_t * w,
+    o70_ref_t r
+);
+
+/* o70_ctstr_data ***********************************************************/
+/**
+ *  Convenience function that returns a pointer to string data (or NULL if
+ *  not a string or empty string).
+ */
+O70_API uint8_t * C42_CALL o70_ctstr_data
+(
+    o70_world_t * w,
+    o70_ref_t r
+);
+
 /* o70_str_create ***********************************************************/
 /**
  *  Creates an empty string object
