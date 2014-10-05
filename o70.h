@@ -794,7 +794,9 @@ C42_INLINE o70_class_t * o70_class_ptr
     o70_ref_t r
 )
 {
-    return (O70_IS_OREF(r)) ? w->ot[w->ohdr[O70_RTOX(r)]->class_ox] : &w->int_class;
+    return O70_IS_OREF(r)
+        ? w->ot[w->ohdr[O70_RTOX(r)]->class_ox] 
+        : &w->int_class;
 }
 
 /* o70_model ****************************************************************/
@@ -814,6 +816,8 @@ C42_INLINE int o70_model
 /**
  *  Returns the reference to the ctstr specified as the name of this object's
  *  class.
+ *  @note this does not increment the ref count of the returned object
+ *  @warning the input reference must be valid or else...
  */
 C42_INLINE o70_ref_t o70_obj_class_name
 (

@@ -188,6 +188,10 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
         ZOB(os = o70_obj_short_desc(&w, obj, &obk));
         ZOB(c42_io8_fmt(out, "o70 test1: obj desc: \"$.*s\"\n", 
                         o70_str_len(&w, obk), o70_str_data(&w, obk)));
+        ZOB(os = o70_dynobj_raw_put(&w, obj, cfi, obk));
+        ZOB(os = o70_ref_dec(&w, obk));
+        ZOB(os = o70_dump_object_map(&w, w.out));
+        ZOB(c42_io8_fmt(out, "==============\n"));
         ZOB(os = o70_ref_dec(&w, obj));
         TOB(w.ffx = O70_RTOX(obj));
         ZOB(os = o70_str_create(&w, &obj));

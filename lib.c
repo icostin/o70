@@ -386,7 +386,7 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->int_class.ohdr.class_ox = O70X_CLASS_CLASS;
         w->int_class.isize = sizeof(o70_object_t);
         w->int_class.model = 0;
-        w->int_class.name = O70_XTOR(O70X_CLASS_ICTSTR);
+        w->int_class.name = O70_XTOR(O70X_INT_ICTSTR);
 
         w->ohdr[O70X_DYNOBJ_CLASS] = &w->dynobj_class.ohdr;
         w->dynobj_class.ohdr.class_ox = O70X_CLASS_CLASS;
@@ -1410,7 +1410,7 @@ O70_API o70_status_t C42_CALL o70_dump_object_map
         if ((w->nfx[i] & 1)) continue;
         oref = O70_XTOR(i);
         class_name = o70_obj_class_name(w, oref);
-        if (c42_io8_fmt(io, "- <$.*s:$04Xd rc=$d", 
+        if (c42_io8_fmt(io, "- <$.*es:$04Xd rc=$d", 
                         o70_ctstr_len(w, class_name), 
                         o70_ctstr_data(w, class_name),
                         O70_XTOR(i), w->ohdr[i]->nref))
@@ -1437,7 +1437,28 @@ O70_API o70_status_t C42_CALL o70_dump_object_map
                             o70_ctstr_data(w, c->name)))
                 return O70S_IO_ERROR;
         }
+        else if ((model & O70M_DYNOBJ))
+        {
+            c42_rbtree_path_t path;
+            c42_rbtree_node_t * n;
+            o70_dynobj_t * o = w->ot[i];
+            for (n = c42_rbtree_first(&path, &o->fields.rbt);
+                 n;
+                 n = c42_rbtree_np(&path, C42_RBTREE_MORE))
+            {
+                o70_prop_node_t * prop = (o70_prop_node_t *) n;
+                o70_ref_t value_class_name;
 
+                value_class_name = o70_obj_class_name(w, prop->kv.val);
+                if (c42_io8_fmt(io, " $.*es=<$.*es:$04Xd/>",
+                                o70_ctstr_len(w, prop->kv.key),
+                                o70_ctstr_data(w, prop->kv.key),
+                                o70_ctstr_len(w, value_class_name),
+                                o70_ctstr_data(w, value_class_name),
+                                prop->kv.val))
+                    return O70S_IO_ERROR;
+            }
+        }
         if (c42_io8_fmt(io, "/>\n")) return O70S_IO_ERROR;
     }
     if (c42_io8_fmt(io, "end object map [world $xp]\n", w)) 
