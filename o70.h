@@ -123,6 +123,7 @@ enum o70_statuses
     O70S_OK = 0, /**< all ok */
     O70S_PENDING, /**< operation is pending; more scripting code needs to be
                     executed before completing the operation */
+    O70S_EXC, /**< exception thrown */
     O70S_MISSING, /**< item/property missing */
     O70S_BAD_ARG, /**< some argument or input field has an incorrect value */
     O70S_BAD_TYPE, /**< an object has the wrong type */
@@ -286,6 +287,12 @@ typedef struct o70_array_s o70_array_t;
  */
 typedef struct o70_function_s o70_function_t;
 
+/* o70_ifunc_t **************************************************************/
+/**
+ *  Interpreted function
+ */
+typedef struct o70_ifunc_s o70_ifunc_t;
+
 /* o70_struct_t *************************************************************/
 /**
  *  Struct object.
@@ -316,17 +323,30 @@ typedef struct o70_varctx_class_s o70_varctx_class_t;
  */
 typedef struct o70_module_s o70_module_t;
 
-/* o70_esf_t ****************************************************************/
+/* o70_exectx_t *************************************************************/
 /**
- *  Execution stack frame.
+ *  Execution context - instance data of a function containing the state
+ *  of execution and local variables.
  */
-typedef struct o70_esf_s o70_esf_t;
+typedef struct o70_exectx_s o70_exectx_t;
 
 /* o70_ehi_t ****************************************************************/
 /**
  *  Exception handler item.
  */
 typedef struct o70_ehi_s o70_ehi_t;
+
+/* o70_ehc_t ****************************************************************/
+/**
+ *  Exception handler chain.
+ */
+typedef struct o70_ehc_s o70_ehc_t;
+
+/* o70_insn_t ***************************************************************/
+/**
+ *  Insn details.
+ */
+typedef struct o70_insn_s o70_insn_t;
 
 /* o70_object_t ***********************************************************/
 /**
@@ -405,22 +425,32 @@ typedef o70_status_t (C42_CALL * o70_obj_set_prop_f)
         void * context
     );
 
+/* o70_func_exec_f **********************************************************/
+/**
+ *  Function handler that executes a portion of code for a script function.
+ * @retval O70S_OK function finished execution normally, the current execution
+ *  context should be popped from the stack
+ * @retval O70S_PENDING a script sub-function was called so we return here
+ *  so that the flow manager calls the handler for that function
+ * @retval O70S_THROW exception thrown
+ */
+typedef o70_status_t (C42_CALL * o70_func_exec_f)
+    (
+        o70_flow_t * flow,
+        o70_exectx_t * e
+    );
+
 /* structs and unions {{{1 */
-struct o70_esf_s
-{
-    uint32_t mod_idx; /**< index in world's module table */
-    uint32_t insn_idx; /**< index in module's instruction table */
-    o70_ref_t func; /**< reference to function currently executing */
-    o70_ref_t varctx; /**< object reference to var context with locals */
-};
 
 struct o70_flow_s
 {
     o70_world_t * world; /**< pointer to the world */
-    o70_esf_t * stack; /**< execution stack */
+    c42_np_t stack; 
+    /**< execution stack - items are o70_exectx_t structures linked using their
+     * links field.
+     **/
     o70_ref_t exc; /**< exception being thrown (or null) */
-    uint32_t n; /**< number of used stack frames */
-    uint32_t m; /**< number of allocated stack frames */
+    c42_np_t wfl; /**< world flow links - list entry for all flows */
 };
 
 struct o70_init_s
@@ -520,23 +550,76 @@ struct o70_array_s
     size_t m; /**< number of items allocated */
 };
 
-struct o70_function_s
+struct o70_exectx_s
 {
     o70_ohdr_t ohdr; /**< object header */
-    o70_module_t * mod; /**< module containing the code */
-    uint32_t fx; /**< function index in the module */
-    o70_ref_t var_ctx_class; /**< ref to class representing the variable context
-                               used during execution of the given function */
-    o70_ref_t parent_var_ctx; /** ref to parent variable context - for regular
-                                functions this points to the module containing
-                                the function */
+    o70_ref_t func; 
+    /**< reference to function that runs the code in this context */
+
+    c42_np_t links;
+    /**< links to form the execution stack */
+
+    o70_ref_t * lv;
+    /**< array of local variables; this would typically point in the same
+     * allocated block as this structure, after all extra fields used by
+     * the function execution handler */
+};
+
+struct o70_function_s
+{
+    o70_class_t cls; /**< class data for the execution context */
+    // o70_module_t * mod; /**< module containing the code */
+    // uint32_t fx; /**< function index in the module */
+    o70_ref_t parent; 
+    /**< parent execution context - this is the context of the code/function
+     * that created this function, allowing us to access its variables;
+     * for instance, if this function is declared in a module the parent
+     * contains all module globals; if the function is a nested fuction,
+     * the parent is the context of the function in which this one is declared 
+     **/
+    o70_ref_t * idt; /**< table with ids for named variables, sorted by
+                          identifier ref value; idn items */
+    uint32_t * sxt; /**< slot indexes corresponding to ids in the table above;
+                         ni items */
     uint32_t * asx; /**< arg slot index table; tells into which slot to put
                          the arguments to the function */
     uint32_t * isx; /**< inited arg slot index table; tells into which slot
                          to put pre-inited args */
     o70_ref_t * iv; /**< inited arg values */
+    o70_func_exec_f exec; /**< handler that executes the function */
+    size_t idn; /**< number of ids */
+    size_t sn; /**< number of slots */
     size_t an; /**< number of arguments */
-    size_t in; /**< number of inited args */
+    size_t ivn; /**< number of inited args */
+};
+
+struct o70_insn_s
+{
+    uint8_t opcode; /**< opcode */
+    uint8_t ecx; /**< exception chain index */
+    uint16_t ax; /**< index in the opcode args array */
+};
+
+struct o70_ifunc_s
+{
+    o70_function_t func;
+    o70_insn_t * it; /**< insn table */
+    uint16_t * at; /**< insn args table */
+    o70_ref_t * ct; /**< const table */
+    o70_ehi_t * eht; /**< exception handler table; this contains all the
+                       exception chains concatenated */
+    o70_ehc_t * ect; /**< exception handler chain table; */
+    unsigned int in; /**< number of instructions */
+    unsigned int an; /**< number of insn args */
+    unsigned int cn; /**< number of constants in the const pool */
+    unsigned int ehn; /**< number of exception handlers */
+    unsigned int ecn; /**< number of exception chains; up to 255 since
+                    o70_insn_t#ecx is byte */
+    unsigned int im; /**< number of allocated instructions */
+    unsigned int am; /**< number of allocated insn args */
+    unsigned int cm; /**< number of allocated constants in the const pool */
+    unsigned int ehm; /**< number of allocated exception handlers */
+    unsigned int ecm; /**< number of allocated exception chains */
 };
 
 struct o70_exception_s
@@ -558,34 +641,27 @@ struct o70_struct_s
     o70_ref_t slots[0]; /**< data slots */
 };
 
-struct o70_varctx_s
-{
-    o70_ohdr_t ohdr; /**< object header */
-    o70_varctx_t * parent; /**< parent object context */
-    o70_ref_t slots[0]; /**< variable slots */
-};
-
 struct o70_varctx_class_s
 {
     o70_class_t cls; /**< standard class fields */
-    o70_ref_t * idt; /**< table with ids for named variables, sorted by
-                          identifier ref value; ni items */
-    uint32_t * sxt; /**< slot indexes corresponding to ids in the table above;
-                         ni items */
-    size_t ni; /**< number of ids */
-    size_t ns; /**< number of slots */
 };
 
 struct o70_ehi_s
 {
-    uint32_t eci; /**< exception class index in constants table */
-    uint32_t hix; /**< handler instruction index */
+    uint16_t ecx; /**< exception class index in constants table */
+    uint16_t hix; /**< handler instruction index */
+};
+
+struct o70_ehc_s
+{
+    uint16_t fehx; /**< first exception handler index */
+    uint16_t ehn; /**< number of exception handlers */
 };
 
 struct o70_module_s
 {
     uint8_t * opc; /**< table of opcodes */
-    uint32_t * aofs; /**< arg offsets */
+    uint32_t * ao; /**< arg offsets */
     uint32_t * ia; /**< instruction args */
     uint32_t * ieh; /**< instruction exception handler */
     uint32_t * ffix; /**< function body first instruction index
@@ -638,6 +714,7 @@ struct o70_world_s
     c42_io8_t * out; /**< standard output */
     c42_io8_t * err; /**< standard error */
 
+    c42_np_t wfl; /**< list of flows linked by their field o70_flow_t#wfl */
     o70_object_t null_obj; /**< null object */
     o70_object_t false_obj; /**< false object */
     o70_object_t true_obj; /**< true object */
@@ -833,7 +910,6 @@ C42_INLINE o70_ref_t o70_obj_class_name
  *  Creates an execution flow.
  *  @param w [in]                   world
  *  @param flow_ptr [out]           receives the pointer to the allocated flow
- *  @param max_stack_depth [in]     max number of stack frames
  *  @retval O70S_OK                 all ok
  *  @retval O70S_BAD_ARG            invalid @a max_stack_depth
  *  @retval O70S_NO_MEM             allocation failed
@@ -842,8 +918,7 @@ C42_INLINE o70_ref_t o70_obj_class_name
 O70_API o70_status_t C42_CALL o70_flow_create
 (
     o70_world_t * w,
-    o70_flow_t * * flow_ptr,
-    uint32_t max_stack_depth
+    o70_flow_t * * flow_ptr
 );
 
 /* o70_flow_destroy *********************************************************/

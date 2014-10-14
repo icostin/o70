@@ -287,7 +287,8 @@ static o70_status_t C42_CALL ics_node_delete
         L("ics_node_delete: path ($d):", path.last + 1);
         for (i = 0; i <= path.last; ++i)
         {
-            L(" $xp ($c)", path.nodes[i], path.sides[i] ? (path.sides[i] == 1 ? 'r' : 'e') : 'l');
+            L(" $xp ($c)", path.nodes[i],
+              path.sides[i] ? (path.sides[i] == 1 ? 'r' : 'e') : 'l');
         }
         L(".\n");
     }
@@ -324,7 +325,7 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->in = ini->in;
         w->out = ini->out;
         w->err = ini->err;
-        //L("world init\n");
+        c42_dlist_init(&w->wfl);
 
         L("t=$x/4z, b=$x/4z, c=$x/4z\n",
                        ini->ma_total_limit && ini->ma_total_limit < SIZE_MAX
@@ -574,6 +575,16 @@ O70_API o70_status_t C42_CALL o70_world_finish
     size_t i;//, j;
 
     L("o70_world_finish: starting\n");
+    while (w->wfl.next != &w->wfl)
+    {
+        o70_flow_t * flow;
+        o70_status_t os;
+        flow = C42_STRUCT_FROM_FIELD_PTR(o70_flow_t, wfl, w->wfl.next);
+        L("kill flow $xp\n", flow);
+        os = o70_flow_destroy(flow);
+        if (os) return os;
+    }
+
     if (w->om)
     {
 #if 0
@@ -751,20 +762,31 @@ O70_API o70_status_t C42_CALL _o70_obj_destroy (o70_world_t * w)
 O70_API o70_status_t C42_CALL o70_flow_create
 (
     o70_world_t * w,
-    o70_flow_t * * flow_ptr,
-    uint32_t max_stack_depth
+    o70_flow_t * * flow_ptr
 )
 {
-    (void) w;
-    (void) flow_ptr;
-    (void) max_stack_depth;
-    return O70S_TODO;
+    o70_flow_t * flow;
+    int mae;
+    mae = C42_MA_VAR_ALLOC(&w->ma, flow);
+    if (mae) return mae == C42_MA_CORRUPT ? O70S_BUG : O70S_NO_MEM;
+    *flow_ptr = flow;
+    flow->world = w;
+    c42_dlist_init(&flow->stack);
+    flow->exc = O70R_NULL;
+    C42_DLIST_APPEND(w->wfl, flow, wfl);
+    L("created flow $xp, wfl=$xp\n", flow, &flow->wfl);
+    return 0;
 }
 
 /* o70_flow_destroy *********************************************************/
 O70_API o70_status_t C42_CALL o70_flow_destroy (o70_flow_t * flow)
 {
-    (void) flow;
+    o70_world_t * w = flow->world;
+    int mae;
+    L("destroying flow $xp...\n", flow);
+    c42_dlist_del(&flow->wfl);
+    mae = C42_MA_VAR_FREE(&w->ma, flow);
+    if (mae) return C42_MA_CORRUPT;
     return O70S_TODO;
 }
 

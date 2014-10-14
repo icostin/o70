@@ -25,11 +25,13 @@ struct test_s
 static uint_fast8_t C42_CALL run_test (c42_svc_t * svc, c42_clia_t * clia);
 static uint_fast8_t C42_CALL test0 (c42_svc_t * svc, c42_clia_t * clia);
 static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia);
+static uint_fast8_t C42_CALL test2 (c42_svc_t * svc, c42_clia_t * clia);
 
 static test_t tests[] =
 {
     { test0, "ctstr" },
     { test1, "prop" },
+    { test2, "flow" },
 };
 
 /* c42_main *****************************************************************/
@@ -219,6 +221,51 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
 
     // rc = (os ? RCRUN : 0) | (osf ? RCFIN : 0);
     // if (c42_io8_fmt(out, "$s test $i\n", rc ? "fail" : "pass", 2)) rc |= RCOUT;
+    return rc;
+}
+
+/* test2 ********************************************************************/
+static uint_fast8_t C42_CALL test2 (c42_svc_t * svc, c42_clia_t * clia)
+{
+    o70_init_t ini;
+    o70_world_t w;
+    o70_flow_t * flow;
+    c42_io8_t * out = &clia->stdio.out;
+    c42_io8_t * err = &clia->stdio.err;
+    o70_status_t os, osf;
+    uint_fast8_t rc = 0, ok = 0;
+
+    C42_VAR_CLEAR(ini);
+    ini.ma = &svc->ma;
+    ini.out = out;
+    ini.err = err;
+    os = o70_world_init(&w, &ini);
+    if (os)
+    {
+        c42_io8_fmt(err, "o70 test: failed initialising world: $s = $b\n", 
+                    o70_status_name(os), os);
+        return RCINI;
+    }
+    do
+    {
+        ZOB(os = o70_flow_create(&w, &flow));
+        ok = 1;
+    }
+    while (0);
+    if (os == O70S_BUG) return RCBUG;
+    if (!ok) 
+    {
+        c42_io8_fmt(err, "o70 test: last error $s = $b\n",
+                    o70_status_name(os), os);
+        rc |= RCRUN;
+    }
+    osf = o70_world_finish(&w);
+    if (osf)
+    {
+        c42_io8_fmt(err, "o70 test: failed finishing world: $s = $b\n",
+                    o70_status_name(osf), osf);
+    }
+
     return rc;
 }
 
