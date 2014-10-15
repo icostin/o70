@@ -248,7 +248,7 @@ static uint_fast8_t C42_CALL test2 (c42_svc_t * svc, c42_clia_t * clia)
     }
     do
     {
-        ZOB(os = o70_flow_create(&w, &flow));
+        ZOB(os = o70_flow_create(&w, &flow, 2));
         ok = 1;
     }
     while (0);

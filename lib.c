@@ -1,15 +1,15 @@
 #include "intern.h"
 
 #if _DEBUG
-#define L(...) (c42_io8_fmt(w->err, __VA_ARGS__))
-#define NZDBGCHK(_expr) if ((_expr)) ; else do { L("*** BUG *** $s:$i:$s: ($s) is zero\n", __FILE__, __LINE__, __FUNCTION__, #_expr); return O70S_BUG; } while (0)
-#define ZDBGCHK(_expr) if (!(_expr)) ; else do { L("*** BUG *** $s:$i:$s: ($s) is non-zero\n", __FILE__, __LINE__, __FUNCTION__, #_expr); return O70S_BUG; } while (0)
+#define L(...) O70_LOG(w, __VA_ARGS__)
+#define A(...) O70_ASSERT(w, __VA_ARGS__)
+//#define NZDBGCHK(_expr) if ((_expr)) ; else do { L("*** BUG *** $s:$i:$s: ($s) is zero\n", __FILE__, __LINE__, __FUNCTION__, #_expr); return O70S_BUG; } while (0)
 #else
 #define L(...)
-#define NZDBGCHK(_expr)
-#define ZDBGCHK(_expr)
+#define A(...)
+//#define NZDBGCHK(_expr)
 #endif
-#define DBGASSERT NZDBGCHK
+//#define A NZDBGCHK
 
 //#define L(...)
 
@@ -207,12 +207,16 @@ O70_API uint8_t const * C42_CALL o70_status_name (o70_status_t sc)
     {
         X(O70S_OK);
         X(O70S_PENDING);
+        X(O70S_EXC);
         X(O70S_MISSING);
         X(O70S_BAD_ARG);
         X(O70S_BAD_TYPE);
         X(O70S_NO_MEM);
         X(O70S_IO_ERROR);
-
+        X(O70S_BAD_FMT);
+        X(O70S_BAD_UTF8);
+        X(O70S_CONV_ERROR);
+        X(O70S_OTHER);
         X(O70S_BUG);
         X(O70S_TODO);
     }
@@ -234,7 +238,7 @@ static uint_fast8_t C42_CALL ics_key_cmp
     o70_world_t * w = context;
     int c;
 
-    NZDBGCHK(O70_IS_OREF(pn->kv.key));
+    A(O70_IS_OREF(pn->kv.key));
     cs = w->ot[O70_RTOX(pn->kv.key)];
 
     if (key_str->n != cs->data.n)
@@ -257,7 +261,7 @@ static o70_status_t C42_CALL ics_node_create
     mae = C42_MA_VAR_ALLOC(&w->ma, node);
     //L("prop_node alloc: $xp (mae=$i)\n", node, mae);
     if (mae) return mae == C42_MA_CORRUPT ? O70S_BUG : O70S_NO_MEM;
-    DBGASSERT(node);
+    A(node);
     node->kv.val = node->kv.key = ctstr;
     c42_rbtree_insert(path, &node->rbtn);
     o70_ref_inc(w, ctstr);
@@ -307,7 +311,7 @@ O70_API o70_status_t C42_CALL o70_world_init
     o70_init_t * ini
 )
 {
-#define A(_x, _id, _str) \
+#define I(_x, _id, _str) \
         w->_id.data.a = (uint8_t *) (_str); w->_id.data.n = sizeof(_str) - 1; \
         rbte = c42_rbtree_find(&path, &w->ics.rbt, (uintptr_t) &w->_id.data); \
         if (rbte != C42_RBTREE_NOT_FOUND) { r = O70S_BUG; break; } \
@@ -472,87 +476,87 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->ohdr[O70X_NULL_ICTSTR] = &w->null_ictstr.ohdr;
         w->null_ictstr.ohdr.nref = 1;
         w->null_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
-        A(O70X_NULL_ICTSTR, null_ictstr, "null");
+        I(O70X_NULL_ICTSTR, null_ictstr, "null");
 
         w->ohdr[O70X_FALSE_ICTSTR] = &w->false_ictstr.ohdr;
         w->false_ictstr.ohdr.nref = 1;
         w->false_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
-        A(O70X_FALSE_ICTSTR, false_ictstr, "false");
+        I(O70X_FALSE_ICTSTR, false_ictstr, "false");
 
         w->ohdr[O70X_TRUE_ICTSTR] = &w->true_ictstr.ohdr;
         w->true_ictstr.ohdr.nref = 1;
         w->true_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
-        A(O70X_TRUE_ICTSTR, true_ictstr, "true");
+        I(O70X_TRUE_ICTSTR, true_ictstr, "true");
 
         w->ohdr[O70X_NULL_CLASS_ICTSTR] = &w->null_class_ictstr.ohdr;
         w->null_class_ictstr.ohdr.nref = 1;
         w->null_class_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
-        A(O70X_NULL_CLASS_ICTSTR, null_class_ictstr, "null_class");
+        I(O70X_NULL_CLASS_ICTSTR, null_class_ictstr, "null_class");
 
         w->ohdr[O70X_BOOL_ICTSTR] = &w->bool_ictstr.ohdr;
         w->bool_ictstr.ohdr.nref = 1;
         w->bool_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
-        A(O70X_BOOL_ICTSTR, bool_ictstr, "bool");
+        I(O70X_BOOL_ICTSTR, bool_ictstr, "bool");
 
         w->ohdr[O70X_INT_ICTSTR] = &w->int_ictstr.ohdr;
         w->int_ictstr.ohdr.nref = 1;
         w->int_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
-        A(O70X_INT_ICTSTR, int_ictstr, "int");
+        I(O70X_INT_ICTSTR, int_ictstr, "int");
 
         w->ohdr[O70X_DYNOBJ_ICTSTR] = &w->dynobj_ictstr.ohdr;
         w->dynobj_ictstr.ohdr.nref = 1;
         w->dynobj_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
-        A(O70X_DYNOBJ_ICTSTR, dynobj_ictstr, "dynobj");
+        I(O70X_DYNOBJ_ICTSTR, dynobj_ictstr, "dynobj");
 
         w->ohdr[O70X_CLASS_ICTSTR] = &w->class_ictstr.ohdr;
         w->class_ictstr.ohdr.nref = 1;
         w->class_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
-        A(O70X_CLASS_ICTSTR, class_ictstr, "class");
+        I(O70X_CLASS_ICTSTR, class_ictstr, "class");
 
         w->ohdr[O70X_ARRAY_ICTSTR] = &w->array_ictstr.ohdr;
         w->array_ictstr.ohdr.nref = 1;
         w->array_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
-        A(O70X_ARRAY_ICTSTR, array_ictstr, "array");
+        I(O70X_ARRAY_ICTSTR, array_ictstr, "array");
 
         w->ohdr[O70X_FUNCTION_ICTSTR] = &w->function_ictstr.ohdr;
         w->function_ictstr.ohdr.nref = 1;
         w->function_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
-        A(O70X_FUNCTION_ICTSTR, function_ictstr, "function");
+        I(O70X_FUNCTION_ICTSTR, function_ictstr, "function");
 
         w->ohdr[O70X_STR_ICTSTR] = &w->str_ictstr.ohdr;
         w->str_ictstr.ohdr.nref = 1;
         w->str_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
-        A(O70X_STR_ICTSTR, str_ictstr, "str");
+        I(O70X_STR_ICTSTR, str_ictstr, "str");
 
         w->ohdr[O70X_CTSTR_ICTSTR] = &w->ctstr_ictstr.ohdr;
         w->ctstr_ictstr.ohdr.nref = 1;
         w->ctstr_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
-        A(O70X_CTSTR_ICTSTR, ctstr_ictstr, "ctstr");
+        I(O70X_CTSTR_ICTSTR, ctstr_ictstr, "ctstr");
 
         w->ohdr[O70X_ACTSTR_ICTSTR] = &w->actstr_ictstr.ohdr;
         w->actstr_ictstr.ohdr.nref = 1;
         w->actstr_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
-        A(O70X_ACTSTR_ICTSTR, actstr_ictstr, "actstr");
+        I(O70X_ACTSTR_ICTSTR, actstr_ictstr, "actstr");
 
         w->ohdr[O70X_ICTSTR_ICTSTR] = &w->ictstr_ictstr.ohdr;
         w->ictstr_ictstr.ohdr.nref = 1;
         w->ictstr_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
-        A(O70X_ICTSTR_ICTSTR, ictstr_ictstr, "ictstr");
+        I(O70X_ICTSTR_ICTSTR, ictstr_ictstr, "ictstr");
 
         w->ohdr[O70X_IACTSTR_ICTSTR] = &w->iactstr_ictstr.ohdr;
         w->iactstr_ictstr.ohdr.nref = 1;
         w->iactstr_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
-        A(O70X_IACTSTR_ICTSTR, iactstr_ictstr, "iactstr");
+        I(O70X_IACTSTR_ICTSTR, iactstr_ictstr, "iactstr");
 
         w->ohdr[O70X_EXCEPTION_ICTSTR] = &w->exception_ictstr.ohdr;
         w->exception_ictstr.ohdr.nref = 1;
         w->exception_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
-        A(O70X_EXCEPTION_ICTSTR, exception_ictstr, "exception");
+        I(O70X_EXCEPTION_ICTSTR, exception_ictstr, "exception");
 
         w->ohdr[O70X_MODULE_ICTSTR] = &w->module_ictstr.ohdr;
         w->module_ictstr.ohdr.nref = 1;
         w->module_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
-        A(O70X_MODULE_ICTSTR, module_ictstr, "module");
+        I(O70X_MODULE_ICTSTR, module_ictstr, "module");
 
         r = 0;
     }
@@ -561,7 +565,7 @@ O70_API o70_status_t C42_CALL o70_world_init
     if (r) w->aux_status = o70_world_finish(w);
 
     return r;
-#undef A
+#undef I
 }
 
 /* o70_world_finish *********************************************************/
@@ -762,17 +766,23 @@ O70_API o70_status_t C42_CALL _o70_obj_destroy (o70_world_t * w)
 O70_API o70_status_t C42_CALL o70_flow_create
 (
     o70_world_t * w,
-    o70_flow_t * * flow_ptr
+    o70_flow_t * * flow_ptr,
+    unsigned int max_depth
 )
 {
     o70_flow_t * flow;
+    size_t size;
     int mae;
-    mae = C42_MA_VAR_ALLOC(&w->ma, flow);
+    if (max_depth > 0x10000) return O70S_BAD_ARG;
+    size = sizeof(o70_flow_t) + max_depth * sizeof(o70_ref_t);
+    mae = c42_ma_alloc(&w->ma, (void * *) flow_ptr, 1, size);
     if (mae) return mae == C42_MA_CORRUPT ? O70S_BUG : O70S_NO_MEM;
-    *flow_ptr = flow;
+    flow = *flow_ptr;
     flow->world = w;
-    c42_dlist_init(&flow->stack);
     flow->exc = O70R_NULL;
+    flow->m = max_depth;
+    flow->n = 0;
+    flow->stack = (o70_ref_t *) (flow + 1);
     C42_DLIST_APPEND(w->wfl, flow, wfl);
     L("created flow $xp, wfl=$xp\n", flow, &flow->wfl);
     return 0;
@@ -782,12 +792,17 @@ O70_API o70_status_t C42_CALL o70_flow_create
 O70_API o70_status_t C42_CALL o70_flow_destroy (o70_flow_t * flow)
 {
     o70_world_t * w = flow->world;
-    int mae;
+    size_t size;
+    unsigned int i, mae;
     L("destroying flow $xp...\n", flow);
+    
     c42_dlist_del(&flow->wfl);
-    mae = C42_MA_VAR_FREE(&w->ma, flow);
-    if (mae) return C42_MA_CORRUPT;
-    return O70S_TODO;
+    size = sizeof(o70_flow_t) + sizeof(o70_ref_t) * flow->m;
+    for (i = 0; i < flow->n; ++i)
+        o70_ref_dec(w, flow->stack[i]);
+    mae = c42_ma_free(&w->ma, flow, 1, size);
+    if (mae) return O70S_BUG;
+    return 0;
 }
 
 /* o70_dump_icst ************************************************************/
@@ -1062,7 +1077,7 @@ static o70_status_t C42_CALL prop_bag_put
         int mae;
         mae = C42_MA_VAR_ALLOC(&w->ma, n);
         if (mae) return mae == C42_MA_CORRUPT ? O70S_BUG : O70S_NO_MEM;
-        DBGASSERT(n);
+        A(n);
         n->kv.key = name;
         c42_rbtree_insert(&path, &n->rbtn);
         o70_ref_inc(w, name);

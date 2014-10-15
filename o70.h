@@ -68,8 +68,9 @@
 #define O70M_STR        (1 << 5) 
 #define O70M_ARRAY      (1 << 6) 
 #define O70M_FUNCTION   (1 << 7) 
-#define O70M_EXCEPTION  (1 << 8) 
-#define O70M_MODULE     (1 << 9)
+#define O70M_EXECTX     (1 << 8) 
+#define O70M_EXCEPTION  (1 << 9) 
+#define O70M_MODULE     (1 << 10)
 
 #define O70M_ANY_CTSTR  (O70M_SCTSTR | O70M_ACTSTR | O70M_ICTSTR)
 
@@ -77,6 +78,21 @@
 #define O70R_NULL       (O70_XTOR(O70X_NULL))
 #define O70R_FALSE      (O70_XTOR(O70X_FALSE))
 #define O70R_TRUE       (O70_XTOR(O70X_TRUE))
+
+#if _DEBUG
+#define O70_LOG(_w, ...) (c42_io8_fmt((_w)->err, __VA_ARGS__))
+
+#define O70_ASSERT(_w, _expr) \
+    if ((_expr)) ; \
+    else do { \
+        O70_LOG((_w), "*** BUG *** $s:$i:$s: assertion failed ($s)\n", \
+                __FILE__, __LINE__, __FUNCTION__, #_expr); \
+        *(char volatile *) NULL = 0; \
+    } while (0)
+#else
+#define O70_LOG(_w, ...)
+#define O70_ASSERT(_w, _expr)
+#endif
 
 /* enums {{{1 */
 /* o70_opcodes **************************************************************/
@@ -445,11 +461,11 @@ typedef o70_status_t (C42_CALL * o70_func_exec_f)
 struct o70_flow_s
 {
     o70_world_t * world; /**< pointer to the world */
-    c42_np_t stack; 
-    /**< execution stack - items are o70_exectx_t structures linked using their
-     * links field.
-     **/
+    o70_ref_t * stack;
+    /**< execution stack - references point to various exectx structures */
     o70_ref_t exc; /**< exception being thrown (or null) */
+    unsigned int n; /**< number of execution contexts in the stack */
+    unsigned int m; /**< number of allocated refs in the stack */
     c42_np_t wfl; /**< world flow links - list entry for all flows */
 };
 
@@ -798,6 +814,22 @@ O70_API o70_status_t C42_CALL o70_world_finish
     o70_world_t * w
 );
 
+/* o70_is_valid_oref ********************************************************/
+/**
+ *  Returns non-zero if the given reference points to a used object, as opposed
+ *  to an unused entry in the object table, or a fast int
+ */
+C42_INLINE int C42_CALL o70_is_valid_oref
+(
+    o70_world_t * w,
+    o70_ref_t oref
+)
+{
+    return O70_IS_OREF(oref) 
+        && O70_RTOX(oref) < w->on 
+        && (w->nfx[O70_RTOX(oref)] & 1) == 0;
+}
+
 /* o70_ref_inc **************************************************************/
 /**
  *  Increments the ref counter for the given object
@@ -808,7 +840,9 @@ C42_INLINE void o70_ref_inc
     o70_ref_t oref
 )
 {
-    if (O70_IS_OREF(oref)) w->ohdr[O70_RTOX(oref)]->nref += 1;
+    if (!O70_IS_OREF(oref)) return;
+    O70_ASSERT(w, o70_is_valid_oref(w, oref));
+    w->ohdr[O70_RTOX(oref)]->nref += 1;
 }
 
 O70_API o70_status_t C42_CALL _o70_obj_destroy (o70_world_t * w);
@@ -822,9 +856,6 @@ O70_API o70_status_t C42_CALL _o70_obj_destroy (o70_world_t * w);
  *  Destroying the current object may cause the destruction of other objects
  *  however, no cycles can be created because the objects destroyed before 
  *  had 0 refs (nobody still pointing to them).
- *  TODO: this func should just queue the object in a destroy list and have 
- *  another api for killing - this will avoid nesting too many calls on the
- *  real stack
  *  @retval 0 all ok
  *  @retval O70S_BUG bug
  */
@@ -918,7 +949,8 @@ C42_INLINE o70_ref_t o70_obj_class_name
 O70_API o70_status_t C42_CALL o70_flow_create
 (
     o70_world_t * w,
-    o70_flow_t * * flow_ptr
+    o70_flow_t * * flow_ptr,
+    unsigned int max_depth
 );
 
 /* o70_flow_destroy *********************************************************/
