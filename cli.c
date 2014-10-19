@@ -140,7 +140,7 @@ static uint_fast8_t C42_CALL test0 (c42_svc_t * svc, c42_clia_t * clia)
     {
         c42_io8_fmt(err, "o70 test0: failed finishing world: $s = $b\n",
                     o70_status_name(osf), osf);
-        rc |= RCRUN;
+        rc |= RCFIN;
     }
 
     // rc = (os ? RCRUN : 0) | (osf ? RCFIN : 0);
@@ -217,6 +217,7 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
     {
         c42_io8_fmt(err, "o70 test1: failed finishing world: $s = $b\n",
                     o70_status_name(osf), osf);
+        rc |= RCFIN;
     }
 
     // rc = (os ? RCRUN : 0) | (osf ? RCFIN : 0);
@@ -234,6 +235,8 @@ static uint_fast8_t C42_CALL test2 (c42_svc_t * svc, c42_clia_t * clia)
     c42_io8_t * err = &clia->stdio.err;
     o70_status_t os, osf;
     uint_fast8_t rc = 0, ok = 0;
+    o70_ref_t fr;
+    o70_ifunc_t * ifunc;
 
     C42_VAR_CLEAR(ini);
     ini.ma = &svc->ma;
@@ -249,6 +252,9 @@ static uint_fast8_t C42_CALL test2 (c42_svc_t * svc, c42_clia_t * clia)
     do
     {
         ZOB(os = o70_flow_create(&w, &flow, 2));
+        ZOB(os = o70_ifunc_create(&w, &fr, 2));
+        ifunc = o70_ptr(&w, fr);
+        ZOB(os = o70_ifunc_append_ret_const(&w, ifunc, O70R_NULL));
         ok = 1;
     }
     while (0);
@@ -264,6 +270,7 @@ static uint_fast8_t C42_CALL test2 (c42_svc_t * svc, c42_clia_t * clia)
     {
         c42_io8_fmt(err, "o70 test: failed finishing world: $s = $b\n",
                     o70_status_name(osf), osf);
+        rc |= RCFIN;
     }
 
     return rc;

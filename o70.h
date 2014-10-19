@@ -24,6 +24,10 @@
  */
 #define O70CFG_INIT_STR_SIZE 10
 
+#define O70CFG_IFUNC_INSN_COUNT_INIT 8
+#define O70CFG_IFUNC_IARG_COUNT_INIT 8
+#define O70CFG_IFUNC_CTAB_COUNT_INIT 8
+
 /* O70_RTOX *****************************************************************/
 /**
  *  converts an object reference to object index.
@@ -68,9 +72,10 @@
 #define O70M_STR        (1 << 5) 
 #define O70M_ARRAY      (1 << 6) 
 #define O70M_FUNCTION   (1 << 7) 
-#define O70M_EXECTX     (1 << 8) 
-#define O70M_EXCEPTION  (1 << 9) 
-#define O70M_MODULE     (1 << 10)
+#define O70M_IFUNC      (1 << 8)
+#define O70M_EXECTX     (1 << 9) 
+#define O70M_EXCEPTION  (1 << 10) 
+#define O70M_MODULE     (1 << 11)
 
 #define O70M_ANY_CTSTR  (O70M_SCTSTR | O70M_ACTSTR | O70M_ICTSTR)
 
@@ -102,8 +107,10 @@
  * _lsx: local slot index
  * _idcx: identifier const index
  * _cbx: code block index
+ * _ctx: const table index
  *
- * resolve out_lsx, name_idcx
+ * ??resolve out_lsx, name_idcx
+ * const dest_lsx, src_ctx
  * fget val_lsx, obj_lsx, name_idcx
  * fset val_lsx, obj_lsx, name_idcx
  * aget val_lsx, arr_lsx, index_lsx
@@ -112,10 +119,12 @@
  * goto tgt_cbx
  * branch cond_lsx, true_lsx, false_lsx
  * ret val_lsx
+ * ret_const val_ctx
  * throw exc_lsx
  */
 enum o70_opcodes
 {
+    O70O_CONST, // sets a local var to a const: lsx, ctx
     O70O_COPY, // copy local var dest_lsx, src_lsx
     O70O_PGET, // get from parent var context: depth, psx, lsx
     O70O_PSET, // set var into parent var context: depth, psx, lsx
@@ -127,6 +136,7 @@ enum o70_opcodes
     O70O_GOTO,
     O70O_BRANCH,
     O70O_RET,
+    O70O_RET_CONST,
     O70O_THROW,
 };
 
@@ -166,6 +176,7 @@ enum o70_builtin_object_indexes
     O70X_INT_CLASS,
     O70X_ARRAY_CLASS,
     O70X_FUNCTION_CLASS,
+    O70X_IFUNC_CLASS,
     O70X_STR_CLASS,
     O70X_CTSTR_CLASS,
     O70X_ACTSTR_CLASS,
@@ -183,6 +194,7 @@ enum o70_builtin_object_indexes
     O70X_CLASS_ICTSTR,
     O70X_ARRAY_ICTSTR,
     O70X_FUNCTION_ICTSTR,
+    O70X_IFUNC_ICTSTR,
     O70X_STR_ICTSTR,
     O70X_CTSTR_ICTSTR,
     O70X_ACTSTR_ICTSTR,
@@ -593,18 +605,22 @@ struct o70_function_s
      * contains all module globals; if the function is a nested fuction,
      * the parent is the context of the function in which this one is declared 
      **/
-    o70_ref_t * idt; /**< table with ids for named variables, sorted by
-                          identifier ref value; idn items */
-    uint32_t * sxt; /**< slot indexes corresponding to ids in the table above;
-                         ni items */
-    uint32_t * asx; /**< arg slot index table; tells into which slot to put
-                         the arguments to the function */
+    // o70_ref_t * idt; /**< table with ids for named variables, sorted by
+    //                       identifier ref value; idn items */
+    // uint32_t * sxt; /**< slot indexes corresponding to ids in the table above;
+    //                      idn items */
+    // uint32_t * asx; /**< arg slot index table; tells into which slot to put
+    //                      the arguments to the function */
+    o70_ref_t * ant; /**< arg name table - items are references to ictstr
+                       instances */
+    uint32_t * axt; /**< arg index table - table with indexes into the slots
+                      array where to put those arguments */
     uint32_t * isx; /**< inited arg slot index table; tells into which slot
                          to put pre-inited args */
-    o70_ref_t * iv; /**< inited arg values */
+    o70_ref_t * ivt; /**< inited arg values */
     o70_func_exec_f exec; /**< handler that executes the function */
-    size_t idn; /**< number of ids */
-    size_t sn; /**< number of slots */
+    //size_t idn; /**< number of ids */
+    size_t sn; /**< number of slots in the execution context */
     size_t an; /**< number of arguments */
     size_t ivn; /**< number of inited args */
 };
@@ -741,6 +757,7 @@ struct o70_world_s
     o70_class_t class_class; /**< class class */
     o70_class_t array_class; /**< array class */
     o70_class_t function_class; /**< function class */
+    o70_class_t ifunc_class; /**< ifunc class */
     o70_class_t str_class; /**< str class */
     o70_class_t ctstr_class; /**< const str class */
     o70_class_t actstr_class; /**< allocated const str class */
@@ -758,6 +775,7 @@ struct o70_world_s
     o70_ctstr_t class_ictstr; /**< class ctstr */
     o70_ctstr_t array_ictstr; /**< array ctstr */
     o70_ctstr_t function_ictstr; /**< function ctstr */
+    o70_ctstr_t ifunc_ictstr; /**< ifunc ctstr */
     o70_ctstr_t str_ictstr; /**< str ctstr */
     o70_ctstr_t ctstr_ictstr; /**< ctstr ctstr */
     o70_ctstr_t actstr_ictstr; /**< actstr ctstr */
@@ -766,7 +784,8 @@ struct o70_world_s
     o70_ctstr_t exception_ictstr; /**< exception ctstr */
     o70_ctstr_t module_ictstr; /**< module ctstr */
     o70_module_t mcore; /**< core module */
-
+    o70_ehc_t empty_ehc; /**< the empty exception handler chain to which all
+                           functions default to */
     o70_pkstat_t aux_status; /**< aux status when the function returns the
                                "main" status */
 };
@@ -847,29 +866,12 @@ C42_INLINE void o70_ref_inc
 
 O70_API o70_status_t C42_CALL _o70_obj_destroy (o70_world_t * w);
 
-/* o70_ref_dec **************************************************************/
-/**
- *  Decrements the number of refs to the given object.
- *  If there are no refs left, then the object will be destroyed.
- *  Object destructors cannot 'call' interpreted code therefore there is no
- *  need for a flow.
- *  Destroying the current object may cause the destruction of other objects
- *  however, no cycles can be created because the objects destroyed before 
- *  had 0 refs (nobody still pointing to them).
- *  @retval 0 all ok
- *  @retval O70S_BUG bug
- */
-C42_INLINE o70_status_t o70_ref_dec
+C42_INLINE o70_status_t o70_ox_ref_dec
 (
     o70_world_t * w,
-    o70_ref_t oref
+    o70_oidx_t ox
 )
 {
-    uint32_t ox;
-
-    /* if not an obj ref then do nothing */
-    if (!O70_IS_OREF(oref)) return 0;
-    ox = O70_RTOX(oref);
     /* most common branch: decrement ref count which remains positive */
     if (w->ohdr[ox]->nref > 1)
     {
@@ -891,6 +893,29 @@ C42_INLINE o70_status_t o70_ref_dec
     return _o70_obj_destroy(w);
 }
 
+/* o70_ref_dec **************************************************************/
+/**
+ *  Decrements the number of refs to the given object.
+ *  If there are no refs left, then the object will be destroyed.
+ *  Object destructors cannot 'call' interpreted code therefore there is no
+ *  need for a flow.
+ *  Destroying the current object may cause the destruction of other objects
+ *  however, no cycles can be created because the objects destroyed before 
+ *  had 0 refs (nobody still pointing to them).
+ *  @retval 0 all ok
+ *  @retval O70S_BUG bug
+ */
+C42_INLINE o70_status_t o70_ref_dec
+(
+    o70_world_t * w,
+    o70_ref_t oref
+)
+{
+    /* if not an obj ref then do nothing */
+    if (!O70_IS_OREF(oref)) return 0;
+    return o70_ox_ref_dec(w, O70_RTOX(oref));
+}
+
 /* o70_class_ptr ************************************************************/
 /**
  *  Returns the pointer to the class corresponding to the given object.
@@ -902,6 +927,7 @@ C42_INLINE o70_class_t * o70_class_ptr
     o70_ref_t r
 )
 {
+    O70_ASSERT(w, !O70_IS_OREF(r) || o70_is_valid_oref(w, r));
     return O70_IS_OREF(r)
         ? w->ot[w->ohdr[O70_RTOX(r)]->class_ox] 
         : &w->int_class;
@@ -918,6 +944,20 @@ C42_INLINE int o70_model
 )
 {
     return o70_class_ptr(w, r)->model;
+}
+
+/* o70_ptr **************************************************************/
+/**
+ *  Returns the object pointer given a valid reference
+ */
+C42_INLINE void * o70_ptr
+(
+    o70_world_t * w,
+    o70_ref_t r
+)
+{
+    O70_ASSERT(w, o70_is_valid_oref(w, r));
+    return w->ot[O70_RTOX(r)];
 }
 
 /* o70_obj_class_name *******************************************************/
@@ -1194,6 +1234,103 @@ O70_API o70_status_t C42_CALL o70_dump_object_map
 (
     o70_world_t * w,
     c42_io8_t * io
+);
+
+/* o70_ifunc_create *********************************************************/
+/**
+ *  Creates an empty function.
+ */
+O70_API o70_status_t C42_CALL o70_ifunc_create
+(
+    o70_world_t * w,
+    o70_ref_t * out,
+    size_t sn
+);
+
+/* o70_ifunc_ita ************************************************************/
+/**
+ *  Reallocates the instruction table.
+ */
+O70_API o70_status_t C42_CALL o70_ifunc_ita
+(
+    o70_world_t * w,
+    o70_ifunc_t * ifunc,
+    unsigned int im
+);
+
+/* o70_ifunc_ata ************************************************************/
+/**
+ *  Resizes the insn arg table.
+ */
+O70_API o70_status_t C42_CALL o70_ifunc_ata
+(
+    o70_world_t * w,
+    o70_ifunc_t * ifunc,
+    unsigned int am
+);
+
+/* o70_ifunc_cta ************************************************************/
+/**
+ *  Resizes the const table.
+ */
+O70_API o70_status_t C42_CALL o70_ifunc_cta
+(
+    o70_world_t * w,
+    o70_ifunc_t * ifunc,
+    unsigned int cm
+);
+
+/* o70_ifunc_eha ************************************************************/
+/**
+ *  Resizes the exception handler table.
+ */
+O70_API o70_status_t C42_CALL o70_ifunc_eha
+(
+    o70_world_t * w,
+    o70_ifunc_t * ifunc,
+    unsigned int ehm
+);
+
+/* o70_ifunc_eca ************************************************************/
+/**
+ *  Resizes the exception chain table.
+ */
+O70_API o70_status_t C42_CALL o70_ifunc_eca
+(
+    o70_world_t * w,
+    o70_ifunc_t * ifunc,
+    unsigned int ecm
+);
+
+/* o70_ifunc_append_ret *****************************************************/
+/**
+ *  Appends a ret instruction.
+ */
+O70_API o70_status_t C42_CALL o70_ifunc_append_ret
+(
+    o70_world_t * w,
+    o70_ifunc_t * ifunc,
+    unsigned int sx
+);
+
+/* o70_ifunc_add_const ******************************************************/
+/**
+ *  Adds a reference to the constant table of an interpreted function.
+ */
+O70_API o70_status_t C42_CALL o70_ifunc_add_const
+(
+    o70_world_t * w,
+    o70_ifunc_t * ifunc,
+    o70_ref_t value,
+    uint16_t * ax
+);
+
+/* o70_ifunc_append_ret_const ***********************************************/
+O70_API o70_status_t C42_CALL o70_ifunc_append_ret_const
+(
+    o70_world_t * w,
+    o70_ifunc_t * ifunc,
+    o70_ref_t value
 );
 
 /* }}}1 */

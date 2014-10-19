@@ -157,6 +157,34 @@ static o70_status_t C42_CALL ictstr_finish
     o70_ref_t r
 );
 
+/* func_finish **************************************************************/
+static o70_status_t C42_CALL func_finish
+(
+    o70_world_t * w,
+    o70_ref_t r
+);
+
+/* ifunc_exectx_finish ******************************************************/
+static o70_status_t C42_CALL ifunc_exectx_finish
+(
+    o70_world_t * w,
+    o70_ref_t obj
+);
+
+/* ifunc_exectx_exec ********************************************************/
+static o70_status_t C42_CALL ifunc_exectx_exec
+(
+    o70_flow_t * flow,
+    o70_exectx_t * e
+);
+
+/* ifunc_finish *************************************************************/
+static o70_status_t C42_CALL ifunc_finish
+(
+    o70_world_t * w,
+    o70_ref_t r
+);
+
 /* o70_lib_name *************************************************************/
 O70_API uint8_t const * C42_CALL o70_lib_name ()
 {
@@ -421,6 +449,15 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->function_class.isize = sizeof(o70_function_t);
         w->function_class.model = O70M_FUNCTION;
         w->function_class.name = O70_XTOR(O70X_FUNCTION_ICTSTR);
+        w->function_class.finish = func_finish;
+
+        w->ohdr[O70X_IFUNC_CLASS] = &w->ifunc_class.ohdr;
+        w->ifunc_class.ohdr.nref = 1;
+        w->ifunc_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->ifunc_class.isize = sizeof(o70_ifunc_t);
+        w->ifunc_class.model = O70M_FUNCTION | O70M_IFUNC;
+        w->ifunc_class.name = O70_XTOR(O70X_IFUNC_ICTSTR);
+        w->ifunc_class.finish = ifunc_finish;
 
         w->ohdr[O70X_STR_CLASS] = &w->str_class.ohdr;
         w->str_class.ohdr.nref = 1;
@@ -523,6 +560,11 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->function_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
         I(O70X_FUNCTION_ICTSTR, function_ictstr, "function");
 
+        w->ohdr[O70X_IFUNC_ICTSTR] = &w->ifunc_ictstr.ohdr;
+        w->ifunc_ictstr.ohdr.nref = 1;
+        w->ifunc_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
+        I(O70X_IFUNC_ICTSTR, ifunc_ictstr, "interpreted_function");
+
         w->ohdr[O70X_STR_ICTSTR] = &w->str_ictstr.ohdr;
         w->str_ictstr.ohdr.nref = 1;
         w->str_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
@@ -558,6 +600,9 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->module_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
         I(O70X_MODULE_ICTSTR, module_ictstr, "module");
 
+        w->empty_ehc.fehx = 0;
+        w->empty_ehc.ehn = 0;
+
         r = 0;
     }
     while (0);
@@ -591,16 +636,6 @@ O70_API o70_status_t C42_CALL o70_world_finish
 
     if (w->om)
     {
-#if 0
-        /* clear chain of free obj slots */
-        for (i = w->ffx; i < w->on; i = j)
-        {
-            j = w->nfx[i] >> 1;
-            w->nfx[i] = 0;
-        }
-        /* all non-NULL entries now are used objects so we can chain them in the
-         * destroy list */
-#endif
         w->fdx = 0;
         for (i = 0; i < w->on; ++i)
             if (!(w->nfx[i] & 1)) // (w->ot[i])
@@ -735,7 +770,7 @@ O70_API o70_status_t C42_CALL _o70_obj_destroy (o70_world_t * w)
         }
         else
         {
-            //L("no queuing\n"); 
+            //L("no queuing\n");
         }
     }
     //L("---\n");
@@ -795,7 +830,7 @@ O70_API o70_status_t C42_CALL o70_flow_destroy (o70_flow_t * flow)
     size_t size;
     unsigned int i, mae;
     L("destroying flow $xp...\n", flow);
-    
+
     c42_dlist_del(&flow->wfl);
     size = sizeof(o70_flow_t) + sizeof(o70_ref_t) * flow->m;
     for (i = 0; i < flow->n; ++i)
@@ -1418,7 +1453,7 @@ O70_API o70_status_t C42_CALL o70_obj_short_desc
 {
     o70_status_t os;
     os = o70_str_create(w, out);
-    if (!os) 
+    if (!os)
     {
         os = o70_str_append_obj_short_desc(w, *out, obj);
         if (os && os != O70S_BUG)
@@ -1447,8 +1482,8 @@ O70_API o70_status_t C42_CALL o70_dump_object_map
         if ((w->nfx[i] & 1)) continue;
         oref = O70_XTOR(i);
         class_name = o70_obj_class_name(w, oref);
-        if (c42_io8_fmt(io, "- <$.*es:$04Xd rc=$d", 
-                        o70_ctstr_len(w, class_name), 
+        if (c42_io8_fmt(io, "- <$.*es:$04Xd rc=$d",
+                        o70_ctstr_len(w, class_name),
                         o70_ctstr_data(w, class_name),
                         O70_XTOR(i), w->ohdr[i]->nref))
             return O70S_IO_ERROR;
@@ -1462,7 +1497,7 @@ O70_API o70_status_t C42_CALL o70_dump_object_map
         else if ((model & O70M_STR))
         {
             o70_str_t * s = w->ot[i];
-            if (c42_io8_fmt(io, " data=\"$.*es\" asize=$xz", 
+            if (c42_io8_fmt(io, " data=\"$.*es\" asize=$xz",
                             s->data.n, s->data.a, s->asize))
                 return O70S_IO_ERROR;
         }
@@ -1498,8 +1533,322 @@ O70_API o70_status_t C42_CALL o70_dump_object_map
         }
         if (c42_io8_fmt(io, "/>\n")) return O70S_IO_ERROR;
     }
-    if (c42_io8_fmt(io, "end object map [world $xp]\n", w)) 
+    if (c42_io8_fmt(io, "end object map [world $xp]\n", w))
         return O70S_IO_ERROR;
+    return 0;
+}
+
+/* ifunc_exectx_finish ******************************************************/
+static o70_status_t C42_CALL ifunc_exectx_finish
+(
+    o70_world_t * w,
+    o70_ref_t obj
+)
+{
+    //unsigned int mae;
+    o70_ifunc_t * ifunc;
+    ifunc = o70_ptr(w, obj);
+    O70_ASSERT(w, (o70_model(w, obj) & O70M_EXECTX));
+    (void) ifunc;
+
+    L("ifunc_exectx_finish: todo\n");
+    return O70S_TODO;
+}
+
+/* ifunc_exectx_exec ********************************************************/
+static o70_status_t C42_CALL ifunc_exectx_exec
+(
+    o70_flow_t * flow,
+    o70_exectx_t * e
+)
+{
+    o70_world_t * w = flow->world;
+    (void) w;
+    (void) flow;
+    (void) e;
+    L("ifunc_exectx_exec: todo\n");
+    return O70S_TODO;
+}
+
+/* o70_ifunc_create *********************************************************/
+O70_API o70_status_t C42_CALL o70_ifunc_create
+(
+    o70_world_t * w,
+    o70_ref_t * out,
+    size_t sn
+)
+{
+    o70_ifunc_t * f;
+    o70_oidx_t ox;
+    o70_status_t os;
+
+    if (sn > (PTRDIFF_MAX - sizeof(o70_exectx_t)) / sizeof(o70_ref_t))
+    {
+        L("ifunc_create: too many slots: $xz\n", sn);
+        return O70S_BAD_ARG;
+    }
+    os = obj_alloc(w, &ox, O70X_IFUNC_CLASS);
+    if (os) return os;
+    *out = O70_XTOR(ox);
+    f = w->ot[ox];
+
+    prop_bag_init(&f->func.cls.fields);
+    prop_bag_init(&f->func.cls.methods);
+    f->func.cls.finish = ifunc_exectx_finish;
+    f->func.cls.finish_context = NULL;
+    f->func.cls.get_prop = NULL;
+    f->func.cls.set_prop = NULL;
+    f->func.cls.prop_context = NULL;
+    f->func.cls.model = O70M_EXECTX;
+    f->func.cls.name = O70R_NULL;
+    f->func.cls.isize = sizeof(o70_exectx_t) + sizeof(o70_ref_t) * sn;
+    f->func.parent = O70R_NULL;
+
+    // f->func.idn = 0;
+    // f->func.idt = NULL;
+    // f->func.sxt = NULL;
+
+    f->func.an = 0;
+    f->func.ant = NULL;
+    f->func.axt = NULL;
+    //f->func.asx = NULL;
+
+    f->func.isx = NULL;
+    f->func.ivt = NULL;
+    f->func.ivn = 0;
+
+    f->func.exec = ifunc_exectx_exec;
+    f->it = NULL; f->in = 0; f->im = 0;
+    f->at = NULL; f->an = 0; f->am = 0;
+    f->ct = NULL; f->cn = 0; f->cm = 0;
+    f->eht = NULL; f->ehn = 0; f->ehm = 0;
+    f->ect = &w->empty_ehc; f->ecn = 1; f->ecm = 0;
+
+    return 0;
+}
+
+/* func_finish **************************************************************/
+static o70_status_t C42_CALL func_finish
+(
+    o70_world_t * w,
+    o70_ref_t r
+)
+{
+    o70_function_t * func;
+    o70_status_t os;
+    size_t i;
+    unsigned int mae;
+    O70_ASSERT(w, (o70_model(w, r) & O70M_FUNCTION));
+    func = o70_ptr(w, r);
+    os = o70_ref_dec(w, func->parent);
+    if (os) return os;
+    for (i = 0; i < func->an; ++i)
+    {
+        os = o70_ref_dec(w, func->ant[i]);
+        if (os) return os;
+    }
+    mae = C42_MA_ARRAY_FREE(&w->ma, func->ant, func->an);
+    if (mae) return O70S_BUG;
+    mae = C42_MA_ARRAY_FREE(&w->ma, func->axt, func->an);
+    if (mae) return O70S_BUG;
+
+    for (i = 0; i < func->ivn; ++i)
+    {
+        os = o70_ref_dec(w, func->ivt[i]);
+        if (os) return os;
+    }
+    mae = C42_MA_ARRAY_FREE(&w->ma, func->ivt, func->ivn);
+    if (mae) return O70S_BUG;
+
+    return 0;
+}
+
+/* ifunc_finish *************************************************************/
+static o70_status_t C42_CALL ifunc_finish
+(
+    o70_world_t * w,
+    o70_ref_t r
+)
+{
+    o70_ifunc_t * ifunc;
+    unsigned int mae;
+    unsigned int i;
+    o70_status_t os;
+
+    ifunc = o70_ptr(w, r);
+    O70_ASSERT(w, (o70_model(w, r) & O70M_IFUNC));
+
+    mae = C42_MA_ARRAY_FREE(&w->ma, ifunc->it, ifunc->im);
+    if (mae) return O70S_BUG;
+    mae = C42_MA_ARRAY_FREE(&w->ma, ifunc->at, ifunc->am);
+    if (mae) return O70S_BUG;
+    for (i = 0; i < ifunc->cn; ++i)
+    {
+        os = o70_ref_dec(w, ifunc->ct[i]);
+        if (os) return os;
+    }
+
+    mae = C42_MA_ARRAY_FREE(&w->ma, ifunc->ct, ifunc->cm);
+    if (mae) return O70S_BUG;
+
+    mae = C42_MA_ARRAY_FREE(&w->ma, ifunc->eht, ifunc->ehm);
+    if (mae) return O70S_BUG;
+
+    mae = C42_MA_ARRAY_FREE(&w->ma, ifunc->ect, ifunc->ecm);
+    if (mae) return O70S_BUG;
+
+    return 0;
+}
+
+/* o70_ifunc_ita ************************************************************/
+O70_API o70_status_t C42_CALL o70_ifunc_ita
+(
+    o70_world_t * w,
+    o70_ifunc_t * ifunc,
+    unsigned int im
+)
+{
+    unsigned int mae;
+    mae = C42_MA_ARRAY_REALLOC(&w->ma, ifunc->it, ifunc->im, im);
+    if (mae)
+    {
+        if (mae == C42_MA_CORRUPT) return O70S_BUG;
+        return O70S_NO_MEM;
+    }
+    ifunc->im = im;
+    return 0;
+}
+
+/* o70_ifunc_ata ************************************************************/
+O70_API o70_status_t C42_CALL o70_ifunc_ata
+(
+    o70_world_t * w,
+    o70_ifunc_t * ifunc,
+    unsigned int am
+)
+{
+    unsigned int mae;
+    mae = C42_MA_ARRAY_REALLOC(&w->ma, ifunc->at, ifunc->am, am);
+    if (mae)
+    {
+        if (mae == C42_MA_CORRUPT) return O70S_BUG;
+        return O70S_NO_MEM;
+    }
+    return 0;
+}
+
+/* o70_ifunc_cta ************************************************************/
+O70_API o70_status_t C42_CALL o70_ifunc_cta
+(
+    o70_world_t * w,
+    o70_ifunc_t * ifunc,
+    unsigned int cm
+)
+{
+    unsigned int mae;
+    mae = C42_MA_ARRAY_REALLOC(&w->ma, ifunc->ct, ifunc->cm, cm);
+    if (mae)
+    {
+        if (mae == C42_MA_CORRUPT) return O70S_BUG;
+        return O70S_NO_MEM;
+    }
+    return 0;
+}
+
+/* o70_ifunc_eha ************************************************************/
+O70_API o70_status_t C42_CALL o70_ifunc_eha
+(
+    o70_world_t * w,
+    o70_ifunc_t * ifunc,
+    unsigned int ehm
+)
+{
+    unsigned int mae;
+    mae = C42_MA_ARRAY_REALLOC(&w->ma, ifunc->eht, ifunc->ehm, ehm);
+    if (mae)
+    {
+        if (mae == C42_MA_CORRUPT) return O70S_BUG;
+        return O70S_NO_MEM;
+    }
+    return 0;
+}
+
+/* o70_ifunc_eca ************************************************************/
+O70_API o70_status_t C42_CALL o70_ifunc_eca
+(
+    o70_world_t * w,
+    o70_ifunc_t * ifunc,
+    unsigned int ecm
+)
+{
+    unsigned int mae;
+    mae = C42_MA_ARRAY_REALLOC(&w->ma, ifunc->ect, ifunc->ecm, ecm);
+    if (mae)
+    {
+        if (mae == C42_MA_CORRUPT) return O70S_BUG;
+        return O70S_NO_MEM;
+    }
+    return 0;
+}
+
+/* o70_ifunc_add_const ******************************************************/
+O70_API o70_status_t C42_CALL o70_ifunc_add_const
+(
+    o70_world_t * w,
+    o70_ifunc_t * ifunc,
+    o70_ref_t value,
+    uint16_t * ax
+)
+{
+    unsigned int i, cm;
+    o70_status_t os;
+    for (i = 0; i < ifunc->cn; ++i)
+    {
+        if (ifunc->ct[i] == value) { *ax = i; return 0; }
+    }
+    cm = ifunc->cm ? ifunc->cm << 1 : O70CFG_IFUNC_CTAB_COUNT_INIT;
+    os = o70_ifunc_cta(w, ifunc, cm);
+    if (os) return os;
+    ifunc->cm = cm;
+    o70_ref_inc(w, value);
+    ifunc->ct[*ax = ifunc->cn++] = value;
+    return 0;
+}
+
+/* o70_ifunc_append_ret_const ***********************************************/
+O70_API o70_status_t C42_CALL o70_ifunc_append_ret_const
+(
+    o70_world_t * w,
+    o70_ifunc_t * ifunc,
+    o70_ref_t value
+)
+{
+    o70_status_t os;
+
+    if (ifunc->in >= ifunc->im)
+    {
+        unsigned int im;
+        im = ifunc->im ? ifunc->im << 1 : O70CFG_IFUNC_INSN_COUNT_INIT;
+        os = o70_ifunc_ita(w, ifunc, im);
+        if (os) return os;
+        ifunc->im = im;
+    }
+    if (ifunc->an >= ifunc->am)
+    {
+        unsigned int am;
+        am = ifunc->am ? ifunc->am << 1 : O70CFG_IFUNC_IARG_COUNT_INIT;
+        os = o70_ifunc_ata(w, ifunc, am);
+        if (os) return os;
+        ifunc->am = am;
+    }
+
+    os = o70_ifunc_add_const(w, ifunc, value, ifunc->at + ifunc->an);
+    if (os) return os;
+    ifunc->it[ifunc->in].opcode = O70O_RET_CONST;
+    ifunc->it[ifunc->in].ecx = 0;
+    ifunc->it[ifunc->in].ax = ifunc->an;
+    ifunc->in++;
+    ifunc->an++;
     return 0;
 }
 
