@@ -1570,6 +1570,22 @@ static o70_status_t C42_CALL ifunc_exectx_exec
     return O70S_TODO;
 }
 
+/* ifunc_exectx_init ********************************************************/
+static o70_status_t C42_CALL ifunc_exectx_init
+(
+    o70_flow_t * flow,
+    o70_exectx_t * e
+)
+{
+    // o70_world_t * w = flow->world;
+    // (void) w;
+    (void) flow;
+    // (void) e;
+    // L("ifunc_exectx_init: todo\n");
+    e->lv = (o70_ref_t *) (e + 1);
+    return 0;
+}
+
 /* o70_ifunc_create *********************************************************/
 O70_API o70_status_t C42_CALL o70_ifunc_create
 (
@@ -1604,19 +1620,15 @@ O70_API o70_status_t C42_CALL o70_ifunc_create
     f->func.cls.isize = sizeof(o70_exectx_t) + sizeof(o70_ref_t) * sn;
     f->func.parent = O70R_NULL;
 
-    // f->func.idn = 0;
-    // f->func.idt = NULL;
-    // f->func.sxt = NULL;
-
     f->func.an = 0;
     f->func.ant = NULL;
     f->func.axt = NULL;
-    //f->func.asx = NULL;
 
     f->func.isx = NULL;
     f->func.ivt = NULL;
     f->func.ivn = 0;
 
+    f->func.init = ifunc_exectx_init;
     f->func.exec = ifunc_exectx_exec;
     f->it = NULL; f->in = 0; f->im = 0;
     f->at = NULL; f->an = 0; f->am = 0;
@@ -1697,7 +1709,7 @@ static o70_status_t C42_CALL ifunc_finish
     mae = C42_MA_ARRAY_FREE(&w->ma, ifunc->ect, ifunc->ecm);
     if (mae) return O70S_BUG;
 
-    return 0;
+    return func_finish(w, r);
 }
 
 /* o70_ifunc_ita ************************************************************/
@@ -1849,6 +1861,42 @@ O70_API o70_status_t C42_CALL o70_ifunc_append_ret_const
     ifunc->it[ifunc->in].ax = ifunc->an;
     ifunc->in++;
     ifunc->an++;
+    return 0;
+}
+
+/* o70_push_call ************************************************************/
+O70_API o70_status_t C42_CALL o70_push_call
+(
+    o70_flow_t * flow,
+    o70_ref_t func_ref
+)
+{
+    o70_world_t * w = flow->world;
+    o70_function_t * func;
+    o70_exectx_t * e;
+    o70_oidx_t ecx;
+    o70_ref_t r;
+    o70_status_t os, os2;
+
+    if (!(o70_model(w, func_ref) & O70M_FUNCTION)) return O70S_BAD_TYPE;
+    if (flow->n == flow->m)
+    {
+        L("execution stack full\n");
+        return O70S_STACK_FULL;
+    }
+
+    os = obj_alloc(w, &ecx, func_ref);
+    if (os) return os;
+    func = w->ot[O70_RTOX(func_ref)];
+    e = w->ot[ecx];
+    flow->stack[flow->n++] = r = O70_XTOR(ecx);
+    e->lv = NULL;
+    os = func->init(flow, e);
+    if (os)
+    {
+        os2 = o70_ref_dec(w, r);
+        return os2 ? os2 : os;
+    }
     return 0;
 }
 

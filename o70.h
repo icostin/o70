@@ -158,6 +158,7 @@ enum o70_statuses
     O70S_BAD_FMT,
     O70S_BAD_UTF8,
     O70S_CONV_ERROR,
+    O70S_STACK_FULL,
 
     O70S_OTHER,
     O70S_BUG = 0x40,
@@ -468,6 +469,17 @@ typedef o70_status_t (C42_CALL * o70_func_exec_f)
         o70_exectx_t * e
     );
 
+/* o70_func_init_f **********************************************************/
+/**
+ *  Function handler to init execution context.
+ */
+typedef o70_status_t (C42_CALL * o70_func_init_f)
+    (
+        o70_flow_t * flow,
+        o70_exectx_t * e
+    );
+
+
 /* structs and unions {{{1 */
 
 struct o70_flow_s
@@ -580,12 +592,8 @@ struct o70_array_s
 
 struct o70_exectx_s
 {
-    o70_ohdr_t ohdr; /**< object header */
-    o70_ref_t func; 
-    /**< reference to function that runs the code in this context */
-
-    c42_np_t links;
-    /**< links to form the execution stack */
+    o70_ohdr_t ohdr; /**< object header;
+        reference to function that runs the code in this context */
 
     o70_ref_t * lv;
     /**< array of local variables; this would typically point in the same
@@ -618,6 +626,7 @@ struct o70_function_s
     uint32_t * isx; /**< inited arg slot index table; tells into which slot
                          to put pre-inited args */
     o70_ref_t * ivt; /**< inited arg values */
+    o70_func_init_f init; /**< handler for initing the function exectx */
     o70_func_exec_f exec; /**< handler that executes the function */
     //size_t idn; /**< number of ids */
     size_t sn; /**< number of slots in the execution context */
@@ -1331,6 +1340,16 @@ O70_API o70_status_t C42_CALL o70_ifunc_append_ret_const
     o70_world_t * w,
     o70_ifunc_t * ifunc,
     o70_ref_t value
+);
+
+/* o70_push_call ************************************************************/
+/**
+ *  Pushes a new execution context for the given function.
+ */
+O70_API o70_status_t C42_CALL o70_push_call
+(
+    o70_flow_t * flow,
+    o70_ref_t func
 );
 
 /* }}}1 */
