@@ -65,7 +65,7 @@ static uint_fast8_t C42_CALL test0 (c42_svc_t * svc, c42_clia_t * clia)
     os = o70_world_init(&w, &ini);
     if (os)
     {
-        c42_io8_fmt(err, "o70 test0: failed initialising world: $s = $b\n", 
+        c42_io8_fmt(err, "o70 test0: failed initialising world: $s = $b\n",
                     o70_status_name(os), os);
         return RCINI;
     }
@@ -166,7 +166,7 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
     os = o70_world_init(&w, &ini);
     if (os)
     {
-        c42_io8_fmt(err, "o70 test1: failed initialising world: $s = $b\n", 
+        c42_io8_fmt(err, "o70 test1: failed initialising world: $s = $b\n",
                     o70_status_name(os), os);
         return RCINI;
     }
@@ -188,7 +188,7 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
         TOB(v == O70_FITOR(1));
         TOB(w.ohdr[O70_RTOX(obj)]->nref == 1);
         ZOB(os = o70_obj_short_desc(&w, obj, &obk));
-        ZOB(c42_io8_fmt(out, "o70 test1: obj desc: \"$.*s\"\n", 
+        ZOB(c42_io8_fmt(out, "o70 test1: obj desc: \"$.*s\"\n",
                         o70_str_len(&w, obk), o70_str_data(&w, obk)));
         ZOB(os = o70_dynobj_raw_put(&w, obj, cfi, obk));
         ZOB(os = o70_ref_dec(&w, obk));
@@ -198,15 +198,15 @@ static uint_fast8_t C42_CALL test1 (c42_svc_t * svc, c42_clia_t * clia)
         TOB(w.ffx = O70_RTOX(obj));
         ZOB(os = o70_str_create(&w, &obj));
         ZOB(os = o70_str_afmt(&w, obj, "I'm s$Xd.", obj));
-        ZOB(c42_io8_fmt(out, "o70 test1: str fmt: $.*s (len: $z)\n", 
-                        o70_str_len(&w, obj), o70_str_data(&w, obj), 
+        ZOB(c42_io8_fmt(out, "o70 test1: str fmt: $.*s (len: $z)\n",
+                        o70_str_len(&w, obj), o70_str_data(&w, obj),
                         o70_str_len(&w, obj)));
         ZOB(os = o70_dump_object_map(&w, w.out));
         ok = 1;
     }
     while (0);
     if (os == O70S_BUG) return RCBUG;
-    if (!ok) 
+    if (!ok)
     {
         c42_io8_fmt(err, "o70 test1: last error $s = $b\n",
                     o70_status_name(os), os);
@@ -245,7 +245,7 @@ static uint_fast8_t C42_CALL test2 (c42_svc_t * svc, c42_clia_t * clia)
     os = o70_world_init(&w, &ini);
     if (os)
     {
-        c42_io8_fmt(err, "o70 test: failed initialising world: $s = $b\n", 
+        c42_io8_fmt(err, "o70 test: failed initialising world: $s = $b\n",
                     o70_status_name(os), os);
         return RCINI;
     }
@@ -254,12 +254,13 @@ static uint_fast8_t C42_CALL test2 (c42_svc_t * svc, c42_clia_t * clia)
         ZOB(os = o70_flow_create(&w, &flow, 2));
         ZOB(os = o70_ifunc_create(&w, &fr, 2));
         ifunc = o70_ptr(&w, fr);
-        ZOB(os = o70_ifunc_append_ret_const(&w, ifunc, O70R_NULL));
+        ZOB(os = o70_ifunc_append_ret_const(&w, ifunc, O70R_TRUE));
+        ZOB(os = o70_push_call(flow, fr));
         ok = 1;
     }
     while (0);
     if (os == O70S_BUG) return RCBUG;
-    if (!ok) 
+    if (!ok)
     {
         c42_io8_fmt(err, "o70 test: last error $s = $b\n",
                     o70_status_name(os), os);
@@ -293,8 +294,8 @@ static uint_fast8_t C42_CALL run_test (c42_svc_t * svc, c42_clia_t * clia)
     for (t = 0; t < C42_ARRAY_LIT_COUNT(tests); ++t)
     {
         rc = tests[t].fn(svc, clia);
-        if (c42_io8_fmt(out, "test #$i $<16s => $s\n", t, tests[t].name, 
-                        rc ? "FAIL" : "pass")) 
+        if (c42_io8_fmt(out, "test #$i $<16s => $s\n", t, tests[t].name,
+                        rc ? "FAIL" : "pass"))
             rc |= RCOUT;
         if (rc) break;
     }

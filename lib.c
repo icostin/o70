@@ -713,6 +713,8 @@ static o70_status_t C42_CALL obj_alloc
     uint_fast8_t mae;
     size_t ox;
 
+    O70_ASSERT(w, clox < w->on);
+    O70_ASSERT(w, !(w->nfx[O70_RTOX(clox)] & 1));
     os = ox_alloc(w, out);
     if (os) return os;
     ox = *out;
@@ -833,8 +835,13 @@ O70_API o70_status_t C42_CALL o70_flow_destroy (o70_flow_t * flow)
 
     c42_dlist_del(&flow->wfl);
     size = sizeof(o70_flow_t) + sizeof(o70_ref_t) * flow->m;
+    O70_ASSERT(w, flow->stack);
     for (i = 0; i < flow->n; ++i)
-        o70_ref_dec(w, flow->stack[i]);
+    {
+        o70_status_t os;
+        os = o70_ref_dec(w, flow->stack[i]);
+        if (os) return os;
+    }
     mae = c42_ma_free(&w->ma, flow, 1, size);
     if (mae) return O70S_BUG;
     return 0;
@@ -1545,14 +1552,27 @@ static o70_status_t C42_CALL ifunc_exectx_finish
     o70_ref_t obj
 )
 {
-    //unsigned int mae;
+    o70_ifunc_exectx_t * ie;
     o70_ifunc_t * ifunc;
-    ifunc = o70_ptr(w, obj);
+    ie = o70_ptr(w, obj);
+    ifunc = w->ot[ie->exectx.ohdr.class_ox];
+    L("ifunc_exectx_finish: ec$xd\n", obj);
+    O70_ASSERT(w, (o70_model(w, O70_XTOR(ie->exectx.ohdr.class_ox)) & O70M_IFUNC));
     O70_ASSERT(w, (o70_model(w, obj) & O70M_EXECTX));
-    (void) ifunc;
+    if (ie->exectx.lv) // this can be NULL if some error happens during the
+        //creation of the context
+    {
+        unsigned int i;
+        O70_ASSERT(w, ie->exectx.lv == &ie->lv[0]);
+        for (i = 0; i < ifunc->func.sn; ++i)
+        {
+            o70_status_t os = o70_ref_dec(w, ie->lv[i]);
+            if (os) return os;
+        }
+    }
+    L("ifunc_exectx_finish done: ec$xd\n", obj);
 
-    L("ifunc_exectx_finish: todo\n");
-    return O70S_TODO;
+    return 0;
 }
 
 /* ifunc_exectx_exec ********************************************************/
@@ -1577,12 +1597,10 @@ static o70_status_t C42_CALL ifunc_exectx_init
     o70_exectx_t * e
 )
 {
-    // o70_world_t * w = flow->world;
-    // (void) w;
+    o70_ifunc_exectx_t * ie = (o70_ifunc_exectx_t *) e;
     (void) flow;
-    // (void) e;
-    // L("ifunc_exectx_init: todo\n");
-    e->lv = (o70_ref_t *) (e + 1);
+    e->lv = &ie->lv[0];
+    ie->c = 0;
     return 0;
 }
 
@@ -1617,7 +1635,8 @@ O70_API o70_status_t C42_CALL o70_ifunc_create
     f->func.cls.prop_context = NULL;
     f->func.cls.model = O70M_EXECTX;
     f->func.cls.name = O70R_NULL;
-    f->func.cls.isize = sizeof(o70_exectx_t) + sizeof(o70_ref_t) * sn;
+    f->func.cls.isize = sizeof(o70_ifunc_exectx_t) + sizeof(o70_ref_t) * sn;
+    L("ifunc_create: isize=$xd\n", f->func.cls.isize);
     f->func.parent = O70R_NULL;
 
     f->func.an = 0;
@@ -1636,6 +1655,7 @@ O70_API o70_status_t C42_CALL o70_ifunc_create
     f->eht = NULL; f->ehn = 0; f->ehm = 0;
     f->ect = &w->empty_ehc; f->ecn = 1; f->ecm = 0;
 
+    L("ifunc_create: r$Xd\n", *out);
     return 0;
 }
 
@@ -1687,6 +1707,7 @@ static o70_status_t C42_CALL ifunc_finish
     unsigned int i;
     o70_status_t os;
 
+    L("ifunc_finish r=$xd\n", r);
     ifunc = o70_ptr(w, r);
     O70_ASSERT(w, (o70_model(w, r) & O70M_IFUNC));
 
@@ -1885,7 +1906,7 @@ O70_API o70_status_t C42_CALL o70_push_call
         return O70S_STACK_FULL;
     }
 
-    os = obj_alloc(w, &ecx, func_ref);
+    os = obj_alloc(w, &ecx, O70_RTOX(func_ref));
     if (os) return os;
     func = w->ot[O70_RTOX(func_ref)];
     e = w->ot[ecx];

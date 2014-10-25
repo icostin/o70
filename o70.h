@@ -66,15 +66,15 @@
 /* Object model constants */
 #define O70M_DYNOBJ     (1 << 0) /**< regular object (with a property bag) */
 #define O70M_CLASS      (1 << 1) /**< class model */
-#define O70M_SCTSTR     (1 << 2) 
+#define O70M_SCTSTR     (1 << 2)
 #define O70M_ACTSTR     (1 << 3)
-#define O70M_ICTSTR     (1 << 4) 
-#define O70M_STR        (1 << 5) 
-#define O70M_ARRAY      (1 << 6) 
-#define O70M_FUNCTION   (1 << 7) 
+#define O70M_ICTSTR     (1 << 4)
+#define O70M_STR        (1 << 5)
+#define O70M_ARRAY      (1 << 6)
+#define O70M_FUNCTION   (1 << 7)
 #define O70M_IFUNC      (1 << 8)
-#define O70M_EXECTX     (1 << 9) 
-#define O70M_EXCEPTION  (1 << 10) 
+#define O70M_EXECTX     (1 << 9)
+#define O70M_EXCEPTION  (1 << 10)
 #define O70M_MODULE     (1 << 11)
 
 #define O70M_ANY_CTSTR  (O70M_SCTSTR | O70M_ACTSTR | O70M_ICTSTR)
@@ -359,6 +359,12 @@ typedef struct o70_module_s o70_module_t;
  */
 typedef struct o70_exectx_s o70_exectx_t;
 
+/* o70_ifunc_exectx_t *******************************************************/
+/**
+ *  Execution context for interpreted functions.
+ */
+typedef struct o70_ifunc_exectx_s o70_ifunc_exectx_t;
+
 /* o70_ehi_t ****************************************************************/
 /**
  *  Exception handler item.
@@ -510,7 +516,7 @@ struct o70_ohdr_s
 {
     union
     {
-        int32_t nref; 
+        int32_t nref;
         /**< number of references to the object; if this is
             negative it means the object is in the destroy list and should not
             have references to it from objects that are not collected as well;
@@ -606,12 +612,12 @@ struct o70_function_s
     o70_class_t cls; /**< class data for the execution context */
     // o70_module_t * mod; /**< module containing the code */
     // uint32_t fx; /**< function index in the module */
-    o70_ref_t parent; 
+    o70_ref_t parent;
     /**< parent execution context - this is the context of the code/function
      * that created this function, allowing us to access its variables;
      * for instance, if this function is declared in a module the parent
      * contains all module globals; if the function is a nested fuction,
-     * the parent is the context of the function in which this one is declared 
+     * the parent is the context of the function in which this one is declared
      **/
     // o70_ref_t * idt; /**< table with ids for named variables, sorted by
     //                       identifier ref value; idn items */
@@ -639,6 +645,13 @@ struct o70_insn_s
     uint8_t opcode; /**< opcode */
     uint8_t ecx; /**< exception chain index */
     uint16_t ax; /**< index in the opcode args array */
+};
+
+struct o70_ifunc_exectx_s
+{
+    o70_exectx_t exectx;
+    unsigned int c; /**< current execution location */
+    o70_ref_t lv[0]; /**< local vars; the field .exectx.lv should point here */
 };
 
 struct o70_ifunc_s
@@ -853,8 +866,8 @@ C42_INLINE int C42_CALL o70_is_valid_oref
     o70_ref_t oref
 )
 {
-    return O70_IS_OREF(oref) 
-        && O70_RTOX(oref) < w->on 
+    return O70_IS_OREF(oref)
+        && O70_RTOX(oref) < w->on
         && (w->nfx[O70_RTOX(oref)] & 1) == 0;
 }
 
@@ -898,7 +911,7 @@ C42_INLINE o70_status_t o70_ox_ref_dec
 #endif
     w->ohdr[ox]->ndx = ~w->fdx;
     w->fdx = ox;
-    
+
     return _o70_obj_destroy(w);
 }
 
@@ -909,7 +922,7 @@ C42_INLINE o70_status_t o70_ox_ref_dec
  *  Object destructors cannot 'call' interpreted code therefore there is no
  *  need for a flow.
  *  Destroying the current object may cause the destruction of other objects
- *  however, no cycles can be created because the objects destroyed before 
+ *  however, no cycles can be created because the objects destroyed before
  *  had 0 refs (nobody still pointing to them).
  *  @retval 0 all ok
  *  @retval O70S_BUG bug
@@ -922,6 +935,7 @@ C42_INLINE o70_status_t o70_ref_dec
 {
     /* if not an obj ref then do nothing */
     if (!O70_IS_OREF(oref)) return 0;
+    O70_ASSERT(w, o70_is_valid_oref(w, oref));
     return o70_ox_ref_dec(w, O70_RTOX(oref));
 }
 
@@ -938,7 +952,7 @@ C42_INLINE o70_class_t * o70_class_ptr
 {
     O70_ASSERT(w, !O70_IS_OREF(r) || o70_is_valid_oref(w, r));
     return O70_IS_OREF(r)
-        ? w->ot[w->ohdr[O70_RTOX(r)]->class_ox] 
+        ? w->ot[w->ohdr[O70_RTOX(r)]->class_ox]
         : &w->int_class;
 }
 
@@ -1114,7 +1128,7 @@ O70_API o70_status_t C42_CALL o70_dynobj_raw_get
  *  @param w [in] world
  *  @param obj [in] any instance derived from object
  *  @param name [in] an internalised const string representing property name
- *  @param value [in] value to be set; 
+ *  @param value [in] value to be set;
  *  @note the ref count of @a value will be incremented
  *  @note if the property did not exist in the object then the ref count of
  *      @a name will be incremented
