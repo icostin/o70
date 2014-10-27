@@ -1921,3 +1921,73 @@ O70_API o70_status_t C42_CALL o70_push_call
     return 0;
 }
 
+/* o70_exec *****************************************************************/
+O70_API o70_status_t C42_CALL o70_exec
+(
+    o70_flow_t * flow,
+    unsigned int min_depth,
+    unsigned int steps_limit
+)
+{
+    o70_world_t * w = flow->world;
+    unsigned int steps;
+
+    (void) w;
+    /* min_depth must be at least one to ensure something is waiting to be
+     * executed */
+    if (!min_depth) return O70S_BAD_ARG;
+    for (steps = 0; flow->n >= min_depth && steps < steps_limit; )
+    {
+        L("exec (steps $i)\n", steps);
+        if (flow->exc)
+        {
+            /* unwinding stack for handling the exception being thrown
+             * TODO: call excception handler for current exectx and 
+             * if the exception got handled resume normal execution, 
+             * otherwise decrement the stack depth */
+        }
+        else
+        {
+            o70_exectx_t * ectx;
+            o70_function_t * func;
+            o70_ref_t ecr;
+            o70_oidx_t fx;
+            o70_status_t os;
+            ecr = flow->stack[flow->n - 1];
+            /* make sure we have an execution context at the stack top */
+            O70_ASSERT(w, o70_is_valid_oref(w, ecr));
+            O70_ASSERT(w, o70_model(w, ecr) & O70M_EXECTX);
+            /* fetch the execution context; its class is the function */
+            ectx = o70_ptr(w, ecr);
+            fx = ectx->ohdr.class_ox;
+            /* check that we have indeed a function as its class */
+            O70_ASSERT(w, o70_model(w, O70_XTOR(fx)) & O70M_FUNCTION);
+            /* fetch the function */
+            func = (o70_function_t *) w->ot[fx];
+            /* run the execution handler */
+            L("EXEC: flow=$xp, depth=$xd, ectx_$Xd, func_$Xd\n", 
+              flow, flow->n, ecr, O70_XTOR(fx));
+            os = func->exec(flow, ectx);
+            steps += flow->steps;
+            L("EXEC: flow=$xp, depth=$xd, ectx_$Xd, func_$Xd"
+              " => status=$s, steps=$xd\n", //, steps=$xd\n", 
+              flow, flow->n, ecr, O70_XTOR(fx), o70_status_name(os), steps);
+            switch (os)
+            {
+            case O70S_OK:
+                flow->n -= 1;
+                break;
+            case O70S_PENDING:
+                break;
+            case O70S_EXC:
+            default:
+                return O70S_BUG;
+            }
+        }
+
+        return O70S_BUG;
+    }
+
+    return flow->n < min_depth ? (flow->exc ? O70S_EXC : 0) : O70S_PENDING;
+}
+

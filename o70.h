@@ -496,6 +496,8 @@ struct o70_flow_s
     o70_ref_t exc; /**< exception being thrown (or null) */
     unsigned int n; /**< number of execution contexts in the stack */
     unsigned int m; /**< number of allocated refs in the stack */
+    unsigned int steps; /**< number of steps executed by the last function->exec
+                            handler */
     c42_np_t wfl; /**< world flow links - list entry for all flows */
 };
 
@@ -1364,6 +1366,26 @@ O70_API o70_status_t C42_CALL o70_push_call
 (
     o70_flow_t * flow,
     o70_ref_t func
+);
+
+/* o70_exec *****************************************************************/
+/**
+ *  Executes a flow.
+ *  @retval 0 executed successfully until the depth of the call stack got
+ *            under @a stop_depth
+ *  @retval O70S_EXC and exception has been thrown which caused the stack
+ *          to unwind beyond @a stop_depth
+ *  @retval O70S_PENDING reached @a steps_limit
+ *  @retval O70S_BAD_ARG @a stop_depth was passed as 0
+ *  @note to execute until the flow is finished pass 1 for @a stop_depth
+ *  @note to execute a function call until it returns use o70_push_call() 
+ *      followed by o70_exec(flow, flow->n, ...)
+ */
+O70_API o70_status_t C42_CALL o70_exec
+(
+    o70_flow_t * flow,
+    unsigned int stop_depth,
+    unsigned int steps_limit
 );
 
 /* }}}1 */

@@ -256,6 +256,7 @@ static uint_fast8_t C42_CALL test2 (c42_svc_t * svc, c42_clia_t * clia)
         ifunc = o70_ptr(&w, fr);
         ZOB(os = o70_ifunc_append_ret_const(&w, ifunc, O70R_TRUE));
         ZOB(os = o70_push_call(flow, fr));
+        ZOB(os = o70_exec(flow, flow->n, 0x80000000));
         ok = 1;
     }
     while (0);
