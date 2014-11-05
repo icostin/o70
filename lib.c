@@ -164,11 +164,31 @@ static o70_status_t C42_CALL func_finish
     o70_ref_t r
 );
 
+/* ifunc_exectx_init ********************************************************/
+static o70_status_t C42_CALL ifunc_exectx_init
+(
+    o70_flow_t * flow,
+    o70_exectx_t * e
+);
+
 /* ifunc_exectx_finish ******************************************************/
 static o70_status_t C42_CALL ifunc_exectx_finish
 (
     o70_world_t * w,
     o70_ref_t obj
+);
+
+/* ifunc_bind ***************************************************************/
+/*
+ * Called when all the code is added to an interpreted function to prepare it
+ * for execution. This will remove the modifiable flag of the function and
+ * it will validate that the code does not referece missing items (jump offsets
+ * outside code, etc) and it may perform any code optimisations desired.
+ */
+static o70_status_t C42_CALL ifunc_bind
+(
+    o70_world_t * w,
+    o70_ifunc_t * ifunc
 );
 
 /* ifunc_exectx_exec ********************************************************/
@@ -244,6 +264,9 @@ O70_API uint8_t const * C42_CALL o70_status_name (o70_status_t sc)
         X(O70S_BAD_FMT);
         X(O70S_BAD_UTF8);
         X(O70S_CONV_ERROR);
+        X(O70S_STACK_FULL);
+        X(O70S_BAD_STATE);
+
         X(O70S_OTHER);
         X(O70S_BUG);
         X(O70S_TODO);
@@ -839,6 +862,7 @@ O70_API o70_status_t C42_CALL o70_flow_destroy (o70_flow_t * flow)
     for (i = 0; i < flow->n; ++i)
     {
         o70_status_t os;
+        L("kill stack item $d: r$Xd\n", i, flow->stack[i]);
         os = o70_ref_dec(w, flow->stack[i]);
         if (os) return os;
     }
@@ -1597,11 +1621,37 @@ static o70_status_t C42_CALL ifunc_exectx_init
     o70_exectx_t * e
 )
 {
+    o70_world_t * w = flow->world;
     o70_ifunc_exectx_t * ie = (o70_ifunc_exectx_t *) e;
-    (void) flow;
+    o70_ifunc_t * ifunc;
+    unsigned int i;
+    O70_ASSERT(w, o70_model(w, O70_XTOR(e->ohdr.class_ox)) & O70M_IFUNC);
+    ifunc = w->ot[e->ohdr.class_ox];
+    if (ifunc->modifiable)
+    {
+        o70_status_t os;
+        os = ifunc_bind(w, ifunc);
+        if (os) return os;
+    }
+
     e->lv = &ie->lv[0];
     ie->c = 0;
+    for (i = 0; i < ifunc->func.sn; ++i) ie->lv[i] = O70R_NULL;
+
     return 0;
+}
+
+/* ifunc_bind ***************************************************************/
+static o70_status_t C42_CALL ifunc_bind
+(
+    o70_world_t * w,
+    o70_ifunc_t * ifunc
+)
+{
+    (void) w;
+    (void) ifunc;
+    L("ifunc_bind: todo\n");
+    return O70S_TODO;
 }
 
 /* o70_ifunc_create *********************************************************/
@@ -1654,6 +1704,7 @@ O70_API o70_status_t C42_CALL o70_ifunc_create
     f->ct = NULL; f->cn = 0; f->cm = 0;
     f->eht = NULL; f->ehn = 0; f->ehm = 0;
     f->ect = &w->empty_ehc; f->ecn = 1; f->ecm = 0;
+    f->modifiable = 1;
 
     L("ifunc_create: r$Xd\n", *out);
     return 0;
@@ -1858,6 +1909,7 @@ O70_API o70_status_t C42_CALL o70_ifunc_append_ret_const
 {
     o70_status_t os;
 
+    if (!ifunc->modifiable) return O70S_BAD_STATE;
     if (ifunc->in >= ifunc->im)
     {
         unsigned int im;
@@ -1915,6 +1967,7 @@ O70_API o70_status_t C42_CALL o70_push_call
     os = func->init(flow, e);
     if (os)
     {
+        flow->n--;
         os2 = o70_ref_dec(w, r);
         return os2 ? os2 : os;
     }
@@ -1932,7 +1985,6 @@ O70_API o70_status_t C42_CALL o70_exec
     o70_world_t * w = flow->world;
     unsigned int steps;
 
-    (void) w;
     /* min_depth must be at least one to ensure something is waiting to be
      * executed */
     if (!min_depth) return O70S_BAD_ARG;
@@ -1984,7 +2036,6 @@ O70_API o70_status_t C42_CALL o70_exec
                 return O70S_BUG;
             }
         }
-
         return O70S_BUG;
     }
 

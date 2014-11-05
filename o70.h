@@ -159,6 +159,7 @@ enum o70_statuses
     O70S_BAD_UTF8,
     O70S_CONV_ERROR,
     O70S_STACK_FULL,
+    O70S_BAD_STATE,
 
     O70S_OTHER,
     O70S_BUG = 0x40,
@@ -676,6 +677,7 @@ struct o70_ifunc_s
     unsigned int cm; /**< number of allocated constants in the const pool */
     unsigned int ehm; /**< number of allocated exception handlers */
     unsigned int ecm; /**< number of allocated exception chains */
+    uint8_t modifiable;
 };
 
 struct o70_exception_s
