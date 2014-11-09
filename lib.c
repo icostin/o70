@@ -266,6 +266,7 @@ O70_API uint8_t const * C42_CALL o70_status_name (o70_status_t sc)
         X(O70S_CONV_ERROR);
         X(O70S_STACK_FULL);
         X(O70S_BAD_STATE);
+        X(O70S_BAD_IFUNC);
 
         X(O70S_OTHER);
         X(O70S_BUG);
@@ -652,28 +653,31 @@ O70_API o70_status_t C42_CALL o70_world_finish
         o70_flow_t * flow;
         o70_status_t os;
         flow = C42_STRUCT_FROM_FIELD_PTR(o70_flow_t, wfl, w->wfl.next);
-        L("kill flow $xp\n", flow);
+        // L("kill flow $xp\n", flow);
         os = o70_flow_destroy(flow);
         if (os) return os;
     }
-
+    // L("world_finish: om=$d\n", w->om);
     if (w->om)
     {
         w->fdx = 0;
         for (i = 0; i < w->on; ++i)
             if (!(w->nfx[i] & 1)) // (w->ot[i])
             {
+                // L("world_finish: queuing r$Xd for destruction\n", O70_XTOR(i));
                 w->ohdr[i]->ndx = ~w->fdx;
                 w->fdx = i;
             }
         rs = _o70_obj_destroy(w);
         if (rs) return rs;
 
+        L("freeing object table...\n");
         mae = C42_MA_ARRAY_FREE(&w->ma, w->ohdr, w->om);
         if (mae) return O70S_BUG;
         w->om = 0;
     }
 
+    // L("world_finish: mm=$d\n", w->mm);
     if (w->mm)
     {
         mae = C42_MA_ARRAY_FREE(&w->ma, w->mod, w->mm);
@@ -839,6 +843,7 @@ O70_API o70_status_t C42_CALL o70_flow_create
     if (mae) return mae == C42_MA_CORRUPT ? O70S_BUG : O70S_NO_MEM;
     flow = *flow_ptr;
     flow->world = w;
+    flow->rv = O70R_NULL;
     flow->exc = O70R_NULL;
     flow->m = max_depth;
     flow->n = 0;
@@ -854,6 +859,7 @@ O70_API o70_status_t C42_CALL o70_flow_destroy (o70_flow_t * flow)
     o70_world_t * w = flow->world;
     size_t size;
     unsigned int i, mae;
+    o70_status_t os;
     L("destroying flow $xp...\n", flow);
 
     c42_dlist_del(&flow->wfl);
@@ -866,8 +872,21 @@ O70_API o70_status_t C42_CALL o70_flow_destroy (o70_flow_t * flow)
         os = o70_ref_dec(w, flow->stack[i]);
         if (os) return os;
     }
+    os = o70_ref_dec(w, flow->rv);
+    if (os) 
+    {
+        L("*** BUG *** flow_destroy: rv ref dec failed\n"); 
+        return os;
+    }
+    os = o70_ref_dec(w, flow->exc);
+    if (os) 
+    {
+        L("*** BUG *** flow_destroy: exc r$Xd ref dec failed\n", flow->exc); 
+        return os;
+    }
     mae = c42_ma_free(&w->ma, flow, 1, size);
     if (mae) return O70S_BUG;
+    L("destroyed flow $xp!\n", flow);
     return 0;
 }
 
@@ -1607,11 +1626,26 @@ static o70_status_t C42_CALL ifunc_exectx_exec
 )
 {
     o70_world_t * w = flow->world;
-    (void) w;
-    (void) flow;
-    (void) e;
-    L("ifunc_exectx_exec: todo\n");
-    return O70S_TODO;
+    o70_ifunc_exectx_t * ie;
+    o70_ifunc_t * f;
+    unsigned int c;
+    O70_ASSERT(w, o70_model(w, O70_XTOR(e->ohdr.class_ox)) & O70M_IFUNC);
+    ie = (o70_ifunc_exectx_t *) e;
+    f = w->ot[e->ohdr.class_ox];
+    c = ie->c;
+    for (;;)
+    {
+        switch (f->it[c].opcode)
+        {
+        case O70O_RET_CONST:
+            flow->rv = f->ct[f->it[c].ax];
+            o70_ref_inc(w, flow->rv);
+            return O70S_OK;
+        default:
+            L("unhandled opcode $xb\n", f->it[c].opcode);
+            return O70S_TODO;
+        }
+    }
 }
 
 /* ifunc_exectx_init ********************************************************/
@@ -1648,10 +1682,51 @@ static o70_status_t C42_CALL ifunc_bind
     o70_ifunc_t * ifunc
 )
 {
+    unsigned int i;
     (void) w;
-    (void) ifunc;
-    L("ifunc_bind: todo\n");
-    return O70S_TODO;
+    L("ifunc_bind: start\n");
+    for (i = 0; i < ifunc->in; ++i)
+    {
+        if (ifunc->it[i].opcode >= O70O__COUNT) 
+        {
+            L("ifunc_bind: f$Xd:insn_$02Xd has invalid opcode $xd\n",
+              ifunc->func.self, i, ifunc->it[i].opcode);
+            return O70S_BAD_IFUNC;
+        }
+        if (ifunc->it[i].ecx >= ifunc->ecn)
+        {
+            L("ifunc_bind: f$Xd:insn_$02Xd has invalid exception chain $xd\n",
+              ifunc->func.self, i, ifunc->it[i].ecx);
+            return O70S_BAD_IFUNC;
+        }
+        switch (ifunc->it[i].opcode)
+        {
+        case O70O_RET_CONST:
+            if ((size_t) ifunc->it[i].ax + 1 > ifunc->an)
+            {
+                L("ifunc_bind: f$Xd:insn_$02Xd (ret const)"
+                  " has invalid arg index $xd\n",
+                  ifunc->func.self, i, ifunc->it[i].ax);
+                return O70S_BAD_IFUNC;
+            }
+            if (ifunc->at[ifunc->it[i].ax] >= ifunc->cn)
+            {
+                L("ifunc_bind: f$Xd:insn_$02Xd (ret const)"
+                  " has invalid const index $xd\n",
+                  ifunc->func.self, i, ifunc->at[ifunc->it[i].ax]);
+            }
+            break;
+
+        default:
+            L("ifunc_bind: TODO: verify insn args for opcode $02xd\n", 
+              ifunc->it[i].opcode);
+            return O70S_TODO;
+        }
+
+    }
+    ifunc->modifiable = 0;
+    L("ifunc_bind: done\n");
+    return 0;
 }
 
 /* o70_ifunc_create *********************************************************/
@@ -1688,6 +1763,7 @@ O70_API o70_status_t C42_CALL o70_ifunc_create
     f->func.cls.isize = sizeof(o70_ifunc_exectx_t) + sizeof(o70_ref_t) * sn;
     L("ifunc_create: isize=$xd\n", f->func.cls.isize);
     f->func.parent = O70R_NULL;
+    f->func.self = *out;
 
     f->func.an = 0;
     f->func.ant = NULL;
@@ -1781,6 +1857,7 @@ static o70_status_t C42_CALL ifunc_finish
     mae = C42_MA_ARRAY_FREE(&w->ma, ifunc->ect, ifunc->ecm);
     if (mae) return O70S_BUG;
 
+    L("ifunc_finish r=$xd done\n", r);
     return func_finish(w, r);
 }
 
@@ -1909,7 +1986,12 @@ O70_API o70_status_t C42_CALL o70_ifunc_append_ret_const
 {
     o70_status_t os;
 
-    if (!ifunc->modifiable) return O70S_BAD_STATE;
+    if (!ifunc->modifiable) 
+    {
+        L("ifunc_append_ret_const: ifunc_$Xd is not in modifiable state!\n",
+          ifunc->func.self);
+        return O70S_BAD_STATE;
+    }
     if (ifunc->in >= ifunc->im)
     {
         unsigned int im;
@@ -1983,6 +2065,7 @@ O70_API o70_status_t C42_CALL o70_exec
 )
 {
     o70_world_t * w = flow->world;
+    o70_status_t os;
     unsigned int steps;
 
     /* min_depth must be at least one to ensure something is waiting to be
@@ -1991,12 +2074,14 @@ O70_API o70_status_t C42_CALL o70_exec
     for (steps = 0; flow->n >= min_depth && steps < steps_limit; )
     {
         L("exec (steps $i)\n", steps);
-        if (flow->exc)
+        if (flow->exc != O70R_NULL)
         {
             /* unwinding stack for handling the exception being thrown
              * TODO: call excception handler for current exectx and 
              * if the exception got handled resume normal execution, 
              * otherwise decrement the stack depth */
+            L("TODO: unwind stack\n");
+            return O70S_BUG;
         }
         else
         {
@@ -2028,17 +2113,24 @@ O70_API o70_status_t C42_CALL o70_exec
             {
             case O70S_OK:
                 flow->n -= 1;
+                os = o70_ref_dec(w, ecr);
+                if (os)
+                {
+                    L("*** BUG ***: bug dereferencing function context r$xd\n",
+                      ecr);
+                    return os;
+                }
                 break;
             case O70S_PENDING:
-                break;
+                //break;
             case O70S_EXC:
             default:
                 return O70S_BUG;
             }
         }
-        return O70S_BUG;
     }
-
-    return flow->n < min_depth ? (flow->exc ? O70S_EXC : 0) : O70S_PENDING;
+    os = flow->n < min_depth ? (flow->exc ? O70S_EXC : 0) : O70S_PENDING;
+    L("EXEC: return $s\n", o70_status_name(os));
+    return os;
 }
 

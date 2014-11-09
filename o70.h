@@ -124,7 +124,7 @@
  */
 enum o70_opcodes
 {
-    O70O_CONST, // sets a local var to a const: lsx, ctx
+    O70O_CONST = 0, // sets a local var to a const: lsx, ctx
     O70O_COPY, // copy local var dest_lsx, src_lsx
     O70O_PGET, // get from parent var context: depth, psx, lsx
     O70O_PSET, // set var into parent var context: depth, psx, lsx
@@ -138,6 +138,8 @@ enum o70_opcodes
     O70O_RET,
     O70O_RET_CONST,
     O70O_THROW,
+
+    O70O__COUNT
 };
 
 /* o70_statuses *************************************************************/
@@ -160,6 +162,7 @@ enum o70_statuses
     O70S_CONV_ERROR,
     O70S_STACK_FULL,
     O70S_BAD_STATE,
+    O70S_BAD_IFUNC,
 
     O70S_OTHER,
     O70S_BUG = 0x40,
@@ -494,6 +497,7 @@ struct o70_flow_s
     o70_world_t * world; /**< pointer to the world */
     o70_ref_t * stack;
     /**< execution stack - references point to various exectx structures */
+    o70_ref_t rv; /**< return value */
     o70_ref_t exc; /**< exception being thrown (or null) */
     unsigned int n; /**< number of execution contexts in the stack */
     unsigned int m; /**< number of allocated refs in the stack */
@@ -622,6 +626,9 @@ struct o70_function_s
      * contains all module globals; if the function is a nested fuction,
      * the parent is the context of the function in which this one is declared
      **/
+    o70_ref_t self;
+    /**< self-reference provided for functions that receive the direct
+     *   pointer */
     // o70_ref_t * idt; /**< table with ids for named variables, sorted by
     //                       identifier ref value; idn items */
     // uint32_t * sxt; /**< slot indexes corresponding to ids in the table above;
@@ -892,6 +899,7 @@ C42_INLINE void o70_ref_inc
 
 O70_API o70_status_t C42_CALL _o70_obj_destroy (o70_world_t * w);
 
+/* o70_ox_ref_dec ***********************************************************/
 C42_INLINE o70_status_t o70_ox_ref_dec
 (
     o70_world_t * w,
@@ -905,7 +913,7 @@ C42_INLINE o70_status_t o70_ox_ref_dec
         return 0;
     }
     /* if the object is already in the destroy chain then leave it untouched */
-    if (w->ohdr[ox]->nref < 0) return 0;
+    if (!ox || w->ohdr[ox]->nref < 0) return 0;
 
     /* if we got here then the object just got its last reference removed;
      * we must add it to the destroy chain */
