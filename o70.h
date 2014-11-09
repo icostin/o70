@@ -912,8 +912,9 @@ C42_INLINE o70_status_t o70_ox_ref_dec
         w->ohdr[ox]->nref -= 1;
         return 0;
     }
+
     /* if the object is already in the destroy chain then leave it untouched */
-    if (!ox || w->ohdr[ox]->nref < 0) return 0;
+    if (ox < O70X__COUNT || w->ohdr[ox]->nref < 0) return 0;
 
     /* if we got here then the object just got its last reference removed;
      * we must add it to the destroy chain */
