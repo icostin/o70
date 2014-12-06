@@ -276,6 +276,34 @@ O70_API uint8_t const * C42_CALL o70_status_name (o70_status_t sc)
 #undef X
 }
 
+/* o70_opcode_name **********************************************************/
+O70_API char * C42_CALL o70_opcode_name
+(
+    uint8_t opcode
+)
+{
+#define X(_x) case _x: return #_x
+    switch (opcode)
+    {
+    X(O70O_CONST);
+    X(O70O_COPY);
+    X(O70O_PGET);
+    X(O70O_PSET);
+    X(O70O_FGET);
+    X(O70O_FSET);
+    X(O70O_AGET);
+    X(O70O_ASET);
+    X(O70O_CALL);
+    X(O70O_GOTO);
+    X(O70O_BRANCH);
+    X(O70O_RET);
+    X(O70O_RET_CONST);
+    X(O70O_THROW);
+    }
+    return "O70O_UNKNOWN";
+#undef X
+}
+
 /* ics_key_cmp **************************************************************/
 static uint_fast8_t C42_CALL ics_key_cmp
 (
@@ -1628,21 +1656,23 @@ static o70_status_t C42_CALL ifunc_exectx_exec
     o70_world_t * w = flow->world;
     o70_ifunc_exectx_t * ie;
     o70_ifunc_t * f;
-    unsigned int c;
+    unsigned int xp;
     O70_ASSERT(w, o70_model(w, O70_XTOR(e->ohdr.class_ox)) & O70M_IFUNC);
     ie = (o70_ifunc_exectx_t *) e;
     f = w->ot[e->ohdr.class_ox];
-    c = ie->c;
+    xp = ie->exectx.xp;
+    O70_ASSERT(w, xp < f->in);
     for (;;)
     {
-        switch (f->it[c].opcode)
+        switch (f->it[xp].opcode)
         {
         case O70O_RET_CONST:
-            flow->rv = f->ct[f->it[c].ax];
+            flow->rv = f->ct[f->it[xp].ax];
             o70_ref_inc(w, flow->rv);
+            ie->exectx.xp = (intptr_t) -1;
             return O70S_OK;
         default:
-            L("unhandled opcode $xb\n", f->it[c].opcode);
+            L("unhandled opcode $xb\n", f->it[xp].opcode);
             return O70S_TODO;
         }
     }
@@ -1669,7 +1699,7 @@ static o70_status_t C42_CALL ifunc_exectx_init
     }
 
     e->lv = &ie->lv[0];
-    ie->c = 0;
+    ie->exectx.xp = 0;
     for (i = 0; i < ifunc->func.sn; ++i) ie->lv[i] = O70R_NULL;
 
     return 0;
@@ -1699,22 +1729,50 @@ static o70_status_t C42_CALL ifunc_bind
               ifunc->func.self, i, ifunc->it[i].ecx);
             return O70S_BAD_IFUNC;
         }
+#define CHECK_ARGS(_n) \
+            if ((size_t) ifunc->it[i].ax + (_n) > ifunc->an) \
+            { \
+                L("ifunc_bind: f$Xd:insn_$02Xd ($s)" \
+                  " has invalid arg index $xd\n", \
+                  ifunc->func.self, i, o70_opcode_name(ifunc->it[i].opcode), \
+                  ifunc->it[i].ax); \
+                return O70S_BAD_IFUNC; \
+            }
+#define CHECK_SLOT(_arg) \
+            if (ifunc->at[ifunc->it[i].ax + (_arg)] >= ifunc->func.sn) \
+            { \
+                L("ifunc_bind: f$Xd:insn_$02Xd ($s)" \
+                  " has invalid slot index $xd\n", \
+                  ifunc->func.self, i, o70_opcode_name(ifunc->it[i].opcode), \
+                  ifunc->at[ifunc->it[i].ax + (_arg)]); \
+                return O70S_BAD_IFUNC; \
+            }
+#define CHECK_CONST(_arg) \
+            if (ifunc->at[ifunc->it[i].ax + (_arg)] >= ifunc->cn) \
+            { \
+                L("ifunc_bind: f$Xd:insn_$02Xd ($s)" \
+                  " has invalid const index $xd\n", \
+                  ifunc->func.self, i, o70_opcode_name(ifunc->it[i].opcode), \
+                  ifunc->at[ifunc->it[i].ax + (_arg)]); \
+                return O70S_BAD_IFUNC; \
+            }
         switch (ifunc->it[i].opcode)
         {
+        case O70O_CONST:
+            CHECK_ARGS(2);
+            CHECK_SLOT(0);
+            CHECK_CONST(1);
+            break;
+
+        case O70O_COPY:
+            CHECK_ARGS(2);
+            CHECK_SLOT(0);
+            CHECK_SLOT(1);
+            break;
+
         case O70O_RET_CONST:
-            if ((size_t) ifunc->it[i].ax + 1 > ifunc->an)
-            {
-                L("ifunc_bind: f$Xd:insn_$02Xd (ret const)"
-                  " has invalid arg index $xd\n",
-                  ifunc->func.self, i, ifunc->it[i].ax);
-                return O70S_BAD_IFUNC;
-            }
-            if (ifunc->at[ifunc->it[i].ax] >= ifunc->cn)
-            {
-                L("ifunc_bind: f$Xd:insn_$02Xd (ret const)"
-                  " has invalid const index $xd\n",
-                  ifunc->func.self, i, ifunc->at[ifunc->it[i].ax]);
-            }
+            CHECK_ARGS(1);
+            CHECK_CONST(0);
             break;
 
         default:
@@ -1722,7 +1780,6 @@ static o70_status_t C42_CALL ifunc_bind
               ifunc->it[i].opcode);
             return O70S_TODO;
         }
-
     }
     ifunc->modifiable = 0;
     L("ifunc_bind: done\n");

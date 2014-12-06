@@ -548,7 +548,7 @@ struct o70_prop_node_s
 
 struct o70_prop_bag_s
 {
-    c42_rbtree_t rbt; /**< red/black tree */
+    c42_rbtree_t rbt; /**< red/black tree; items are o70_prop_node_t */
 };
 
 struct o70_object_s
@@ -565,8 +565,10 @@ struct o70_dynobj_s
 struct o70_class_s
 {
     o70_ohdr_t ohdr; /**< object header */
+
     o70_prop_bag_t fields; /**< fields */
     o70_prop_bag_t methods; /**< methods */
+
     o70_obj_finish_f finish; /**< finish callback */
     o70_obj_get_prop_f get_prop; /**< get property */
     o70_obj_set_prop_f set_prop; /**< set property */
@@ -575,11 +577,13 @@ struct o70_class_s
     void * prop_context;
     /**< context for o70_class_t#get_prop and o70_class_t#set_prop */
 
+    o70_ref_t * sct; /**< superclass table */
+    o70_ref_t * scn; /**< number of superclasses */
+    size_t isize; /**< size in bytes of instances */
+    // size_t class_size; /**< size in bytes of the class object */
     uint32_t model; /**< bitmask for primitive types compatible with instances
                          of this class */
     o70_ref_t name; /**< class name - for information purposes */
-    size_t isize; /**< size in bytes of instances */
-    // size_t class_size; /**< size in bytes of the class object */
 };
 
 struct o70_ctstr_s
@@ -607,6 +611,8 @@ struct o70_exectx_s
 {
     o70_ohdr_t ohdr; /**< object header;
         reference to function that runs the code in this context */
+
+    uintptr_t xp; /**< execution pointer - where to execute from */
 
     o70_ref_t * lv;
     /**< array of local variables; this would typically point in the same
@@ -644,6 +650,8 @@ struct o70_function_s
     o70_ref_t * ivt; /**< inited arg values */
     o70_func_init_f init; /**< handler for initing the function exectx */
     o70_func_exec_f exec; /**< handler that executes the function */
+    void * context; /**< context for init/exec; interpreted functions can
+                      store here the reference to their icode object */
     //size_t idn; /**< number of ids */
     size_t sn; /**< number of slots in the execution context */
     size_t an; /**< number of arguments */
@@ -660,7 +668,6 @@ struct o70_insn_s
 struct o70_ifunc_exectx_s
 {
     o70_exectx_t exectx;
-    unsigned int c; /**< current execution location */
     o70_ref_t lv[0]; /**< local vars; the field .exectx.lv should point here */
 };
 
@@ -1397,6 +1404,15 @@ O70_API o70_status_t C42_CALL o70_exec
     o70_flow_t * flow,
     unsigned int stop_depth,
     unsigned int steps_limit
+);
+
+/* o70_opcode_name **********************************************************/
+/**
+ *  Returns a static string with the name of the opcode.
+ */
+O70_API char * C42_CALL o70_opcode_name
+(
+    uint8_t opcode
 );
 
 /* }}}1 */
