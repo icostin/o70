@@ -24,9 +24,9 @@
  */
 #define O70CFG_INIT_STR_SIZE 10
 
-#define O70CFG_IFUNC_INSN_COUNT_INIT 8
-#define O70CFG_IFUNC_IARG_COUNT_INIT 8
-#define O70CFG_IFUNC_CTAB_COUNT_INIT 8
+#define O70CFG_ICODE_INSN_COUNT_INIT 8
+#define O70CFG_ICODE_IARG_COUNT_INIT 8
+#define O70CFG_ICODE_CTAB_COUNT_INIT 8
 
 /* O70_RTOX *****************************************************************/
 /**
@@ -76,6 +76,7 @@
 #define O70M_EXECTX     (1 << 9)
 #define O70M_EXCEPTION  (1 << 10)
 #define O70M_MODULE     (1 << 11)
+#define O70M_ICODE      (1 << 12)
 
 #define O70M_ANY_CTSTR  (O70M_SCTSTR | O70M_ACTSTR | O70M_ICTSTR)
 
@@ -189,6 +190,7 @@ enum o70_builtin_object_indexes
     O70X_IACTSTR_CLASS,
     O70X_EXCEPTION_CLASS,
     O70X_MODULE_CLASS,
+    O70X_ICODE_CLASS,
     O70X_NULL_ICTSTR,
     O70X_FALSE_ICTSTR,
     O70X_TRUE_ICTSTR,
@@ -207,6 +209,7 @@ enum o70_builtin_object_indexes
     O70X_IACTSTR_ICTSTR,
     O70X_EXCEPTION_ICTSTR,
     O70X_MODULE_ICTSTR,
+    O70X_ICODE_ICTSTR,
 
     O70X__COUNT /* Dracula ^..^ */
 };
@@ -325,6 +328,12 @@ typedef struct o70_function_s o70_function_t;
  *  Interpreted function
  */
 typedef struct o70_ifunc_s o70_ifunc_t;
+
+/* o70_icode_t **************************************************************/
+/**
+ *  Inerpreted code.
+ */
+typedef struct o70_icode_s o70_icode_t;
 
 /* o70_struct_t *************************************************************/
 /**
@@ -694,6 +703,29 @@ struct o70_ifunc_s
     uint8_t modifiable;
 };
 
+struct o70_icode_s
+{
+    o70_ohdr_t ohdr;
+    o70_insn_t * it; /**< insn table */
+    uint16_t * at; /**< insn args table */
+    o70_ref_t * ct; /**< const table */
+    o70_ehi_t * eht; /**< exception handler table; this contains all the
+                       exception chains concatenated */
+    o70_ehc_t * ect; /**< exception handler chain table; */
+    unsigned int in; /**< number of instructions */
+    unsigned int an; /**< number of insn args */
+    unsigned int cn; /**< number of constants in the const pool */
+    unsigned int ehn; /**< number of exception handlers */
+    unsigned int ecn; /**< number of exception chains; up to 255 since
+                    o70_insn_t#ecx is byte */
+    unsigned int im; /**< number of allocated instructions */
+    unsigned int am; /**< number of allocated insn args */
+    unsigned int cm; /**< number of allocated constants in the const pool */
+    unsigned int ehm; /**< number of allocated exception handlers */
+    unsigned int ecm; /**< number of allocated exception chains */
+    uint8_t modifiable;
+};
+
 struct o70_exception_s
 {
     o70_ohdr_t ohdr; /**< object header */
@@ -804,6 +836,7 @@ struct o70_world_s
     o70_class_t ictstr_class; /**< internalized const str class */
     o70_class_t iactstr_class; /**< internalized allocated const str class */
     o70_class_t exception_class; /**< exception class */
+    o70_class_t icode_class; /**< icode class */
     o70_class_t module_class; /**< module class */
     o70_ctstr_t null_ictstr; /**< null ctstr */
     o70_ctstr_t false_ictstr; /**< false ctstr */
@@ -823,6 +856,7 @@ struct o70_world_s
     o70_ctstr_t iactstr_ictstr; /**< iactstr ctstr */
     o70_ctstr_t exception_ictstr; /**< exception ctstr */
     o70_ctstr_t module_ictstr; /**< module ctstr */
+    o70_ctstr_t icode_ictstr; /**< icode ctstr */
     o70_module_t mcore; /**< core module */
     o70_ehc_t empty_ehc; /**< the empty exception handler chain to which all
                            functions default to */
@@ -1396,7 +1430,7 @@ O70_API o70_status_t C42_CALL o70_push_call
  *  @retval O70S_PENDING reached @a steps_limit
  *  @retval O70S_BAD_ARG @a stop_depth was passed as 0
  *  @note to execute until the flow is finished pass 1 for @a stop_depth
- *  @note to execute a function call until it returns use o70_push_call() 
+ *  @note to execute a function call until it returns use o70_push_call()
  *      followed by o70_exec(flow, flow->n, ...)
  */
 O70_API o70_status_t C42_CALL o70_exec

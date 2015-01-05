@@ -555,6 +555,13 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->exception_class.model = O70M_EXCEPTION;
         w->exception_class.name = O70_XTOR(O70X_EXCEPTION_ICTSTR);
 
+        w->ohdr[O70X_ICODE_CLASS] = &w->icode_class.ohdr;
+        w->icode_class.ohdr.nref = 1;
+        w->icode_class.ohdr.class_ox = O70X_CLASS_CLASS;
+        w->icode_class.isize = sizeof(o70_exception_t);
+        w->icode_class.model = O70M_ICODE;
+        w->icode_class.name = O70_XTOR(O70X_ICODE_ICTSTR);
+
         w->ohdr[O70X_MODULE_CLASS] = &w->module_class.ohdr;
         w->module_class.ohdr.nref = 1;
         w->module_class.ohdr.class_ox = O70X_CLASS_CLASS;
@@ -652,6 +659,11 @@ O70_API o70_status_t C42_CALL o70_world_init
         w->module_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
         I(O70X_MODULE_ICTSTR, module_ictstr, "module");
 
+        w->ohdr[O70X_ICODE_ICTSTR] = &w->icode_ictstr.ohdr;
+        w->icode_ictstr.ohdr.nref = 1;
+        w->icode_ictstr.ohdr.class_ox = O70X_ICTSTR_CLASS;
+        I(O70X_ICODE_ICTSTR, icode_ictstr, "icode");
+
         w->empty_ehc.fehx = 0;
         w->empty_ehc.ehn = 0;
 
@@ -681,21 +693,26 @@ O70_API o70_status_t C42_CALL o70_world_finish
         o70_flow_t * flow;
         o70_status_t os;
         flow = C42_STRUCT_FROM_FIELD_PTR(o70_flow_t, wfl, w->wfl.next);
-        // L("kill flow $xp\n", flow);
+        L("kill flow $xp\n", flow);
         os = o70_flow_destroy(flow);
         if (os) return os;
     }
-    // L("world_finish: om=$d\n", w->om);
+    L("world_finish: on=$xd, om=$xd\n", w->on, w->om);
     if (w->om)
     {
         w->fdx = 0;
         for (i = 0; i < w->on; ++i)
+        {
             if (!(w->nfx[i] & 1)) // (w->ot[i])
             {
-                // L("world_finish: queuing r$Xd for destruction\n", O70_XTOR(i));
+                //L("world_finish: queuing r$Xd for destruction\n", O70_XTOR(i));
+                //L("ohdr[r$Xd] = $xp\n", O70_XTOR(i), w->ohdr[i]);
                 w->ohdr[i]->ndx = ~w->fdx;
                 w->fdx = i;
+                //L("world_finish: queued r$Xd for destruction\n", O70_XTOR(i));
             }
+        }
+        L("destroying queued objects...\n");
         rs = _o70_obj_destroy(w);
         if (rs) return rs;
 
@@ -705,7 +722,7 @@ O70_API o70_status_t C42_CALL o70_world_finish
         w->om = 0;
     }
 
-    // L("world_finish: mm=$d\n", w->mm);
+    L("world_finish: mm=$d\n", w->mm);
     if (w->mm)
     {
         mae = C42_MA_ARRAY_FREE(&w->ma, w->mod, w->mm);
@@ -901,15 +918,15 @@ O70_API o70_status_t C42_CALL o70_flow_destroy (o70_flow_t * flow)
         if (os) return os;
     }
     os = o70_ref_dec(w, flow->rv);
-    if (os) 
+    if (os)
     {
-        L("*** BUG *** flow_destroy: rv ref dec failed\n"); 
+        L("*** BUG *** flow_destroy: rv ref dec failed\n");
         return os;
     }
     os = o70_ref_dec(w, flow->exc);
-    if (os) 
+    if (os)
     {
-        L("*** BUG *** flow_destroy: exc r$Xd ref dec failed\n", flow->exc); 
+        L("*** BUG *** flow_destroy: exc r$Xd ref dec failed\n", flow->exc);
         return os;
     }
     mae = c42_ma_free(&w->ma, flow, 1, size);
@@ -1717,7 +1734,7 @@ static o70_status_t C42_CALL ifunc_bind
     L("ifunc_bind: start\n");
     for (i = 0; i < ifunc->in; ++i)
     {
-        if (ifunc->it[i].opcode >= O70O__COUNT) 
+        if (ifunc->it[i].opcode >= O70O__COUNT)
         {
             L("ifunc_bind: f$Xd:insn_$02Xd has invalid opcode $xd\n",
               ifunc->func.self, i, ifunc->it[i].opcode);
@@ -1776,7 +1793,7 @@ static o70_status_t C42_CALL ifunc_bind
             break;
 
         default:
-            L("ifunc_bind: TODO: verify insn args for opcode $02xd\n", 
+            L("ifunc_bind: TODO: verify insn args for opcode $02xd\n",
               ifunc->it[i].opcode);
             return O70S_TODO;
         }
@@ -2024,7 +2041,7 @@ O70_API o70_status_t C42_CALL o70_ifunc_add_const
     {
         if (ifunc->ct[i] == value) { *ax = i; return 0; }
     }
-    cm = ifunc->cm ? ifunc->cm << 1 : O70CFG_IFUNC_CTAB_COUNT_INIT;
+    cm = ifunc->cm ? ifunc->cm << 1 : O70CFG_ICODE_CTAB_COUNT_INIT;
     os = o70_ifunc_cta(w, ifunc, cm);
     if (os) return os;
     ifunc->cm = cm;
@@ -2043,7 +2060,7 @@ O70_API o70_status_t C42_CALL o70_ifunc_append_ret_const
 {
     o70_status_t os;
 
-    if (!ifunc->modifiable) 
+    if (!ifunc->modifiable)
     {
         L("ifunc_append_ret_const: ifunc_$Xd is not in modifiable state!\n",
           ifunc->func.self);
@@ -2052,7 +2069,7 @@ O70_API o70_status_t C42_CALL o70_ifunc_append_ret_const
     if (ifunc->in >= ifunc->im)
     {
         unsigned int im;
-        im = ifunc->im ? ifunc->im << 1 : O70CFG_IFUNC_INSN_COUNT_INIT;
+        im = ifunc->im ? ifunc->im << 1 : O70CFG_ICODE_INSN_COUNT_INIT;
         os = o70_ifunc_ita(w, ifunc, im);
         if (os) return os;
         ifunc->im = im;
@@ -2060,7 +2077,7 @@ O70_API o70_status_t C42_CALL o70_ifunc_append_ret_const
     if (ifunc->an >= ifunc->am)
     {
         unsigned int am;
-        am = ifunc->am ? ifunc->am << 1 : O70CFG_IFUNC_IARG_COUNT_INIT;
+        am = ifunc->am ? ifunc->am << 1 : O70CFG_ICODE_IARG_COUNT_INIT;
         os = o70_ifunc_ata(w, ifunc, am);
         if (os) return os;
         ifunc->am = am;
@@ -2134,8 +2151,8 @@ O70_API o70_status_t C42_CALL o70_exec
         if (flow->exc != O70R_NULL)
         {
             /* unwinding stack for handling the exception being thrown
-             * TODO: call excception handler for current exectx and 
-             * if the exception got handled resume normal execution, 
+             * TODO: call excception handler for current exectx and
+             * if the exception got handled resume normal execution,
              * otherwise decrement the stack depth */
             L("TODO: unwind stack\n");
             return O70S_BUG;
@@ -2159,12 +2176,12 @@ O70_API o70_status_t C42_CALL o70_exec
             /* fetch the function */
             func = (o70_function_t *) w->ot[fx];
             /* run the execution handler */
-            L("EXEC: flow=$xp, depth=$xd, ectx_$Xd, func_$Xd\n", 
+            L("EXEC: flow=$xp, depth=$xd, ectx_$Xd, func_$Xd\n",
               flow, flow->n, ecr, O70_XTOR(fx));
             os = func->exec(flow, ectx);
             steps += flow->steps;
             L("EXEC: flow=$xp, depth=$xd, ectx_$Xd, func_$Xd"
-              " => status=$s, steps=$xd\n", //, steps=$xd\n", 
+              " => status=$s, steps=$xd\n", //, steps=$xd\n",
               flow, flow->n, ecr, O70_XTOR(fx), o70_status_name(os), steps);
             switch (os)
             {
