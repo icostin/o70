@@ -323,12 +323,6 @@ typedef struct o70_array_s o70_array_t;
  */
 typedef struct o70_function_s o70_function_t;
 
-/* o70_ifunc_t **************************************************************/
-/**
- *  Interpreted function
- */
-typedef struct o70_ifunc_s o70_ifunc_t;
-
 /* o70_icode_t **************************************************************/
 /**
  *  Inerpreted code.
@@ -346,18 +340,6 @@ typedef struct o70_struct_s o70_struct_t;
  *  Class object for Struct-derived objects.
  */
 typedef struct o70_struct_class_s o70_struct_class_t;
-
-/* o70_varctx_t *************************************************************/
-/**
- *  Variable context object.
- */
-typedef struct o70_varctx_s o70_varctx_t;
-
-/* o70_varctx_class_t *******************************************************/
-/**
- *  Class object for Variable Contexts.
- */
-typedef struct o70_varctx_class_s o70_varctx_class_t;
 
 /* o70_module_t *************************************************************/
 /**
@@ -680,29 +662,6 @@ struct o70_ifunc_exectx_s
     o70_ref_t lv[0]; /**< local vars; the field .exectx.lv should point here */
 };
 
-struct o70_ifunc_s
-{
-    o70_function_t func;
-    o70_insn_t * it; /**< insn table */
-    uint16_t * at; /**< insn args table */
-    o70_ref_t * ct; /**< const table */
-    o70_ehi_t * eht; /**< exception handler table; this contains all the
-                       exception chains concatenated */
-    o70_ehc_t * ect; /**< exception handler chain table; */
-    unsigned int in; /**< number of instructions */
-    unsigned int an; /**< number of insn args */
-    unsigned int cn; /**< number of constants in the const pool */
-    unsigned int ehn; /**< number of exception handlers */
-    unsigned int ecn; /**< number of exception chains; up to 255 since
-                    o70_insn_t#ecx is byte */
-    unsigned int im; /**< number of allocated instructions */
-    unsigned int am; /**< number of allocated insn args */
-    unsigned int cm; /**< number of allocated constants in the const pool */
-    unsigned int ehm; /**< number of allocated exception handlers */
-    unsigned int ecm; /**< number of allocated exception chains */
-    uint8_t modifiable;
-};
-
 struct o70_icode_s
 {
     o70_ohdr_t ohdr;
@@ -712,6 +671,11 @@ struct o70_icode_s
     o70_ehi_t * eht; /**< exception handler table; this contains all the
                        exception chains concatenated */
     o70_ehc_t * ect; /**< exception handler chain table; */
+    uint32_t * snt; /**< number of slots required per level of imbrication;
+                         level 0 tells how many slots are needed for local 
+                         variables, level 1 tells how many slots are needed in
+                         the parent context (the instance of parent function);
+                         this array is created after a call to validate */
     unsigned int in; /**< number of instructions */
     unsigned int an; /**< number of insn args */
     unsigned int cn; /**< number of constants in the const pool */
@@ -723,7 +687,9 @@ struct o70_icode_s
     unsigned int cm; /**< number of allocated constants in the const pool */
     unsigned int ehm; /**< number of allocated exception handlers */
     unsigned int ecm; /**< number of allocated exception chains */
-    uint8_t modifiable;
+    unsigned int snn; /**< number of levels of imbrication; this is used as
+                        the count for snt array */
+    uint8_t ready;
 };
 
 struct o70_exception_s
@@ -743,11 +709,6 @@ struct o70_struct_s
 {
     o70_ohdr_t ohdr; /**< object header */
     o70_ref_t slots[0]; /**< data slots */
-};
-
-struct o70_varctx_class_s
-{
-    o70_class_t cls; /**< standard class fields */
 };
 
 struct o70_ehi_s
@@ -1313,101 +1274,209 @@ O70_API o70_status_t C42_CALL o70_dump_object_map
     c42_io8_t * io
 );
 
-/* o70_ifunc_create *********************************************************/
+/* o70_icode_create *********************************************************/
 /**
- *  Creates an empty function.
+ *  Creates an icode object.
+ *  These objects hold the code for interpreted functions.
+ *  @param w [in, out]  world
+ *  @param ref_p [out]  where to store the reference to the created object
+ *  @param sn [in]      number of slots (local vars & args)
  */
-O70_API o70_status_t C42_CALL o70_ifunc_create
+O70_API o70_status_t C42_CALL o70_icode_create
 (
     o70_world_t * w,
-    o70_ref_t * out,
+    o70_ref_t * ref_p,
     size_t sn
 );
 
-/* o70_ifunc_ita ************************************************************/
+/* o70_icode_ita ************************************************************/
 /**
- *  Reallocates the instruction table.
+ *  Adjusts the number of allocated instructions in the given interpreted code
+ *  object.
+ *  @param w [in] world
+ *  @param c [in, out] interpreted code objectt o be modified
+ *  @param im [in] number of instructions to have allocated
+ *  @retval O70S_OK done
+ *  @retval O70S_BUG heap corruption, bad table pointer
+ *  @retval O70S_NO_MEM could not reallocate table to desired item count
  */
-O70_API o70_status_t C42_CALL o70_ifunc_ita
+O70_API o70_status_t C42_CALL o70_icode_ita
 (
-    o70_world_t * w,
-    o70_ifunc_t * ifunc,
+    o70_world_t * restrict w,
+    o70_icode_t * restrict c,
     unsigned int im
 );
 
-/* o70_ifunc_ata ************************************************************/
+/* o70_icode_ata ************************************************************/
 /**
- *  Resizes the insn arg table.
+ *  Adjusts the number of allocated instruction arguments in the given 
+ *  interpreted code object.
+ *  @param w [in] world
+ *  @param c [in, out] interpreted code objectt o be modified
+ *  @param am [in] number of instruction arguments to have allocated
+ *  @retval O70S_OK done
+ *  @retval O70S_BUG heap corruption, bad table pointer
+ *  @retval O70S_NO_MEM could not reallocate table to desired item count
  */
-O70_API o70_status_t C42_CALL o70_ifunc_ata
+O70_API o70_status_t C42_CALL o70_icode_ata
 (
-    o70_world_t * w,
-    o70_ifunc_t * ifunc,
+    o70_world_t * restrict w,
+    o70_icode_t * restrict c,
     unsigned int am
 );
 
-/* o70_ifunc_cta ************************************************************/
+/* o70_icode_cta ************************************************************/
 /**
- *  Resizes the const table.
+ *  Adjusts the number of allocated constants in the given interpreted code
+ *  object.
+ *  @param w [in] world
+ *  @param c [in, out] interpreted code objectt o be modified
+ *  @param cm [in] number of constants to have allocated
+ *  @retval O70S_OK done
+ *  @retval O70S_BUG heap corruption, bad table pointer
+ *  @retval O70S_NO_MEM could not reallocate table to desired item count
  */
-O70_API o70_status_t C42_CALL o70_ifunc_cta
+O70_API o70_status_t C42_CALL o70_icode_cta
 (
-    o70_world_t * w,
-    o70_ifunc_t * ifunc,
-    unsigned int cm
+    o70_world_t * restrict w,
+    o70_icode_t * restrict c,
+    unsigned int ctm
 );
 
-/* o70_ifunc_eha ************************************************************/
+/* o70_icode_ehta ***********************************************************/
 /**
- *  Resizes the exception handler table.
+ *  Adjusts the number of allocated exception handlers in the given interpreted
+ *  code object.
+ *  @param w [in] world
+ *  @param c [in, out] interpreted code objectt o be modified
+ *  @param ehm [in] number of exception handlers to have allocated
+ *  @retval O70S_OK done
+ *  @retval O70S_BUG heap corruption, bad table pointer
+ *  @retval O70S_NO_MEM could not reallocate table to desired item count
  */
-O70_API o70_status_t C42_CALL o70_ifunc_eha
+O70_API o70_status_t C42_CALL o70_icode_ehta
 (
-    o70_world_t * w,
-    o70_ifunc_t * ifunc,
+    o70_world_t * restrict w,
+    o70_icode_t * restrict c,
     unsigned int ehm
 );
 
-/* o70_ifunc_eca ************************************************************/
+/* o70_icode_ecta ***********************************************************/
 /**
- *  Resizes the exception chain table.
+ *  Adjusts the number of allocated exception chains in the given interpreted 
+ *  code object.
+ *  @param w [in] world
+ *  @param c [in, out] interpreted code objectt o be modified
+ *  @param ecm [in] number of exception chains to have allocated
+ *  @retval O70S_OK done
+ *  @retval O70S_BUG heap corruption, bad table pointer
+ *  @retval O70S_NO_MEM could not reallocate table to desired item count
  */
-O70_API o70_status_t C42_CALL o70_ifunc_eca
+O70_API o70_status_t C42_CALL o70_icode_ecta
 (
-    o70_world_t * w,
-    o70_ifunc_t * ifunc,
+    o70_world_t * restrict w,
+    o70_icode_t * restrict c,
     unsigned int ecm
 );
 
-/* o70_ifunc_append_ret *****************************************************/
+/* o70_icode_add_const ******************************************************/
 /**
- *  Appends a ret instruction.
+ *  Adds a constant to the interpreted code's constant table.
+ *  @param w [in] world
+ *  @param icode [in, out] interpreted code object
+ *  @param value [in] constant reference to add
+ *  @param cx [out] receives the index in the constant table where the value
+ *      is placed
+ *  @retval O70S_OK done
+ *  @retval O70S_NO_MEM could not reallocate table of constants
+ *  @retval O70S_BUG heap corruption, bad table pointer, etc
+ *  @note if the reference is already in the table of constants then it will
+ *      be reused (the index of the existing value is placed in @a ax)
  */
-O70_API o70_status_t C42_CALL o70_ifunc_append_ret
+O70_API o70_status_t C42_CALL o70_icode_add_const
 (
-    o70_world_t * w,
-    o70_ifunc_t * ifunc,
-    unsigned int sx
-);
-
-/* o70_ifunc_add_const ******************************************************/
-/**
- *  Adds a reference to the constant table of an interpreted function.
- */
-O70_API o70_status_t C42_CALL o70_ifunc_add_const
-(
-    o70_world_t * w,
-    o70_ifunc_t * ifunc,
+    o70_world_t * restrict w,
+    o70_icode_t * restrict icode,
     o70_ref_t value,
-    uint16_t * ax
+    uint16_t * restrict cx
 );
 
-/* o70_ifunc_append_ret_const ***********************************************/
-O70_API o70_status_t C42_CALL o70_ifunc_append_ret_const
+/* o70_icode_append_ret_const ***********************************************/
+/**
+ *  Appends the instruction "ret const_value" to the interpreted code.
+ *  @param w [in] world
+ *  @param icode [in, out] interpreted code object
+ *  @param value [in] constant reference to be returned
+ */
+O70_API o70_status_t C42_CALL o70_icode_append_ret_const
 (
-    o70_world_t * w,
-    o70_ifunc_t * ifunc,
+    o70_world_t * restrict w,
+    o70_icode_t * restrict icode,
     o70_ref_t value
+);
+
+/* o70_icode_ready **********************************************************/
+/**
+  * Validates and freezes an instance of interpreted code.
+  * This stage is needed for using the code in a function object.
+  * @retval O70S_OK code is valid and now ready for linking in function objects
+  * @retval O70S_NO_MEM not enough memory
+  * @retval O70S_BUG some bug detected (heap corruption, etc)
+  * @note if the icode object is already in the ready state then this function
+  *     just returns with O70S_OK.
+  **/
+O70_API o70_status_t C42_CALL o70_icode_ready
+(
+    o70_world_t * restrict w,
+    o70_icode_t * restrict icode
+);
+
+/* o70_icode_reserve_insn ***************************************************/
+/**
+ *  Reserves space in the internal tables for the given number of instructions
+ *  and instruction arguments.
+ *  @param w [in]
+ *      world
+ *  @param icode [in, out]
+ *      interpreted code object to modify
+ *  @param insn_ap [out]
+ *      pointer to the array of instructions that will be made available after
+ *      a successful call to this function
+ *  @param iarg_ap [out]
+ *      pointer to the array of instruction arguments
+ *  @retval O70S_OK 
+ *      all ok
+ *  @retval O70S_BAD_STATE
+ *      intepreted code already in ready state so no further changes are
+ *      allowed to the code
+ *  @retval O70S_BAD_ARG
+ *      the number of instructions or the number of instruction arguments
+ *      causes an int overflow when applied to the currently used counter
+ *  @retval O70S_NO_MEM
+ *      not enough memory
+ *  @retval O70S_BUG
+ *      heap corruption or some other bug detected
+ */
+O70_API o70_status_t C42_CALL o70_icode_reserve_insn
+(
+    o70_world_t * restrict w,
+    o70_icode_t * restrict icode,
+    o70_insn_t * * restrict insn_ap,
+    unsigned int * restrict ax_p,
+    unsigned int insn_n,
+    unsigned int iarg_n
+);
+
+/* o70_ifunc_create *********************************************************/
+/**
+ *  Creates an interpreted function.
+ */
+O70_API o70_status_t C42_CALL o70_ifunc_create
+(
+    o70_world_t * restrict w,
+    o70_ref_t * ifunc_ref_p,
+    o70_ref_t icode_ref,
+    o70_ref_t parent_exectx_ref
 );
 
 /* o70_push_call ************************************************************/

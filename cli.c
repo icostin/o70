@@ -235,7 +235,9 @@ static uint_fast8_t C42_CALL test2 (c42_svc_t * svc, c42_clia_t * clia)
     c42_io8_t * err = &clia->stdio.err;
     o70_status_t os, osf;
     uint_fast8_t rc = 0, ok = 0;
-    //o70_ref_t fr;
+    o70_ref_t cr;
+    o70_icode_t * icode;
+    o70_ref_t fr;
     //o70_ifunc_t * ifunc;
 
     C42_VAR_CLEAR(ini);
@@ -252,11 +254,12 @@ static uint_fast8_t C42_CALL test2 (c42_svc_t * svc, c42_clia_t * clia)
     do
     {
         ZOB(os = o70_flow_create(&w, &flow, 2));
-        //ZOB(os = o70_ifunc_create(&w, &fr, 2));
-        //ifunc = o70_ptr(&w, fr);
-        //ZOB(os = o70_ifunc_append_ret_const(&w, ifunc, O70R_TRUE));
-        //ZOB(os = o70_push_call(flow, fr));
-        //ZOB(os = o70_exec(flow, flow->n, 0x80000000));
+        ZOB(os = o70_icode_create(&w, &cr, 2));
+        icode = o70_ptr(&w, cr);
+        ZOB(os = o70_icode_append_ret_const(&w, icode, O70R_TRUE));
+        ZOB(os = o70_ifunc_create(&w, &fr, cr, O70R_NULL));
+        ZOB(os = o70_push_call(flow, fr));
+        ZOB(os = o70_exec(flow, flow->n, 0x80000000));
         ok = 1;
     }
     while (0);
