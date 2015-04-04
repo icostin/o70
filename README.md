@@ -1,5 +1,7 @@
-o70
+o70 [obsolete]
 ===
+
+The code here was used as the base for o71.
 
 Ostropel scripting engine
 
